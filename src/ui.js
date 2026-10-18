@@ -1,5 +1,4 @@
-/*global navigate, __YTAF_VERSION__*/
-import './spatial-navigation-polyfill.js';
+/*global __YTAF_VERSION__*/
 import {
   configAddChangeListener,
   configRead,
@@ -9,10 +8,37 @@ import {
 import './ui.css';
 import { requireElement } from './player_api/helpers';
 
-// We handle key events ourselves.
-window.__spatialNavigation__.keyMode = 'NONE';
-
 const ARROW_KEY_CODE = { 37: 'left', 38: 'up', 39: 'right', 40: 'down' };
+
+/**
+ * Move focus between the options panel's checkboxes. The panel is a single
+ * vertical list, so only up/down do anything.
+ * @param {HTMLElement} container
+ * @param {'left' | 'up' | 'right' | 'down'} direction
+ */
+function navigate(container, direction) {
+  if (direction !== 'up' && direction !== 'down') return;
+
+  const items = Array.from(container.querySelectorAll('input'));
+  if (!items.length) return;
+
+  const current = items.indexOf(document.activeElement);
+  let next;
+  if (current === -1) {
+    next = direction === 'down' ? 0 : items.length - 1;
+  } else {
+    next = current + (direction === 'down' ? 1 : -1);
+    if (next < 0 || next >= items.length) return;
+  }
+
+  const target = items[next];
+  target.focus();
+  if (typeof target.scrollIntoViewIfNeeded === 'function') {
+    target.scrollIntoViewIfNeeded(false);
+  } else {
+    target.scrollIntoView(false);
+  }
+}
 
 const colorCodeMap = new Map([
   [403, 'red'],
@@ -93,7 +119,7 @@ function createOptionsPanel() {
       }
 
       if (evt.keyCode in ARROW_KEY_CODE) {
-        navigate(ARROW_KEY_CODE[evt.keyCode]);
+        navigate(elmContainer, ARROW_KEY_CODE[evt.keyCode]);
       } else if (evt.keyCode === 13) {
         // "OK" button
 
