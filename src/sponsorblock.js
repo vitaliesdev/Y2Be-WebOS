@@ -55,6 +55,71 @@ const categoryConfigKeys = {
 
 const sponsorblockAPI = 'https://sponsorblock.inf.re/api';
 
+/**
+ * Nearest ancestor of `elm` (exclusive) with the given tag name, or null.
+ * (`Element.closest` is not available on all supported webOS versions.)
+ * @param {Element} elm
+ * @param {string} tagName Uppercase tag name
+ * @returns {HTMLElement | null}
+ */
+function findAncestor(elm, tagName) {
+  for (let node = elm.parentElement; node; node = node.parentElement) {
+    if (node.tagName === tagName) return node;
+  }
+  return null;
+}
+
+/**
+ * Whether `elm` or one of its ancestors hides it (e.g. the player controls
+ * fading out).
+ * @param {Element} elm
+ */
+function isHiddenByAncestor(elm) {
+  for (
+    let node = elm;
+    node && node !== document.body;
+    node = node.parentElement
+  ) {
+    if (node.classList.contains('zylon-hidden')) return true;
+    const style = window.getComputedStyle(node);
+    if (
+      style.display === 'none' ||
+      style.visibility === 'hidden' ||
+      style.opacity === '0'
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Find the element of the progress bar that spans its whole width.
+ * @returns {HTMLElement | null}
+ */
+function findSlider() {
+  const last = (selector) => {
+    const nodes = document.querySelectorAll(selector);
+    return nodes[nodes.length - 1] ?? null;
+  };
+
+  // Progress bar with chapters: holds one child per chapter.
+  const chapters = last(
+    'ytlr-multi-markers-player-bar-renderer [idomkey=progress-bar]'
+  );
+  if (chapters) return chapters;
+
+  // Progress bar without chapters.
+  const slider = last('ytlr-progress-bar [idomkey=slider]');
+  if (slider) return slider;
+
+  // Older layouts.
+  const nodes = document.querySelectorAll('[idomkey=progress-bar]');
+  if (nodes.length === 3) return nodes[2];
+  if (nodes.length === 2) return nodes[1].querySelector('[idomkey=slider]');
+  return null;
+}
+
 class SponsorBlockHandler {
   video = null;
   active = true;
@@ -66,6 +131,11 @@ class SponsorBlockHandler {
   sliderInterval = null;
   sliderObserver = null;
   sliderSegmentsOverlay = null;
+  // Set when the progress bar has chapters: the overlay goes next to it.
+  overlayAnchor = null;
+  lastOverlaySig = null;
+  overlaySyncInterval = null;
+  watchForSlider = null;
 
   scheduleSkipHandler = null;
   durationChangeHandler = null;
@@ -173,24 +243,12 @@ class SponsorBlockHandler {
       return;
     }
 
-    const videoDuration = this.video.duration;
-
-    this.sliderSegmentsOverlay = document.createElement('div');
+    // Custom tag names: YouTube's renderer (incremental-dom) can adopt foreign
+    // `div`s while patching its own tree and wipe their children.
+    this.sliderSegmentsOverlay = document.createElement('ytaf-sb-overlay');
     this.sliderSegmentsOverlay.className =
       'ytaf-sponsorblock-segment-container';
-
-    this.segments.forEach((segment) => {
-      const [start, end] = segment.segment;
-      const barType = barTypes[segment.category] || {
-        color: 'blue'
-      };
-      const elm = document.createElement('div');
-      elm.className = 'ytaf-sponsorblock-segment';
-      elm.style['background-color'] = barType.color;
-      elm.style['left'] = `${(start / videoDuration) * 100.0}%`;
-      elm.style['width'] = `${((end - start) / videoDuration) * 100.0}%`;
-      this.sliderSegmentsOverlay.appendChild(elm);
-    });
+    this.renderSegments();
 
     const addSliderObserver = (ele) => {
       this.sliderObserver.observe(ele, {
@@ -200,58 +258,160 @@ class SponsorBlockHandler {
     };
 
     const addSliderOverlay = () => {
-      this.slider.appendChild(this.sliderSegmentsOverlay);
+      const overlay = this.sliderSegmentsOverlay;
+      // Restore the segments if something emptied the overlay.
+      if (overlay.childElementCount !== this.segments.length) {
+        this.renderSegments();
+      }
+      if (this.overlayAnchor) {
+        // YouTube re-renders the chapter bar and its container, dropping any
+        // foreign element. Keep the overlay outside its tree, on <body>, and
+        // place it over the bar using viewport coordinates.
+        if (overlay.parentElement !== document.body) {
+          overlay.style.position = 'fixed';
+          overlay.style.zIndex = '2000';
+          document.body.appendChild(overlay);
+        }
+        this.syncOverlayPosition();
+      } else {
+        // Undo the chapter bar placement in case the layout changed.
+        if (overlay.parentElement === document.body) {
+          overlay.removeAttribute('style');
+          this.lastOverlaySig = null;
+        }
+        this.slider.appendChild(overlay);
+      }
+    };
+
+    // YouTube may keep removing the overlay; re-adding it on every removal
+    // can turn into a remove/re-add loop that hangs the app. Throttle it.
+    let readdTimeout = null;
+    let syncPending = false;
+    const scheduleReaddOverlay = () => {
+      if (readdTimeout !== null) return;
+      readdTimeout = setTimeout(() => {
+        readdTimeout = null;
+        if (this.active && this.slider?.isConnected) addSliderOverlay();
+      }, 250);
     };
 
     const watchForSlider = () => {
       if (this.sliderInterval) clearInterval(this.sliderInterval);
 
       this.sliderInterval = setInterval(() => {
-        const nodes = document.querySelectorAll('[idomkey=progress-bar]');
-        const last = nodes[nodes.length - 1];
-        switch (nodes.length) {
-          case 3: {
-            // Slider has chapter markers.
-            this.slider = last;
-            break;
-          }
-          case 2: {
-            // Slider has no markers or auto-markers
-            this.slider = last.querySelector('[idomkey=slider]');
-            break;
-          }
-          default: {
-            return; // no slider found yet
-          }
+        const slider = findSlider();
+        if (!slider) return; // no slider found yet
+
+        this.slider = slider;
+        this.overlayAnchor = findAncestor(
+          slider,
+          'YTLR-MULTI-MARKERS-PLAYER-BAR-RENDERER'
+        );
+
+        const positioned = this.overlayAnchor?.parentElement ?? slider;
+        // Without chapters the overlay is absolutely positioned inside the slider.
+        if (
+          !this.overlayAnchor &&
+          window.getComputedStyle(slider).position === 'static'
+        ) {
+          slider.style.position = 'relative';
         }
 
-        console.debug('slider found...', this.slider);
+        console.debug('slider found...', this.slider, this.overlayAnchor);
         clearInterval(this.sliderInterval);
         this.sliderInterval = null;
-        addSliderObserver(last);
+        // Observe the parent so removal of the slider itself is noticed.
+        addSliderObserver(positioned.parentElement ?? positioned);
         addSliderOverlay();
+
+        // Showing/hiding the controls doesn't always cause a DOM mutation or a
+        // video event (e.g. while paused), so also sync periodically.
+        clearInterval(this.overlaySyncInterval);
+        this.overlaySyncInterval = this.overlayAnchor
+          ? setInterval(() => this.syncOverlayPosition(), 500)
+          : null;
       }, 100);
     };
+    this.watchForSlider = watchForSlider;
 
     this.sliderObserver = new MutationObserver((mutations) => {
-      mutations.forEach((m) => {
-        if (m.removedNodes) {
-          for (const node of m.removedNodes) {
-            if (node === this.sliderSegmentsOverlay) {
-              console.debug('bringing back segments overlay');
-              addSliderOverlay();
-            }
-            if (node === this.slider) {
-              console.debug('slider removed, watching again');
-              this.sliderObserver.disconnect();
-              watchForSlider();
-            }
+      for (const m of mutations) {
+        for (const node of Array.from(m.removedNodes)) {
+          if (node === this.sliderSegmentsOverlay) {
+            console.debug('bringing back segments overlay');
+            scheduleReaddOverlay();
+          }
+          if (node === this.slider || node === this.overlayAnchor) {
+            console.debug('slider removed, watching again');
+            this.sliderObserver.disconnect();
+            watchForSlider();
+            return;
           }
         }
-      });
+      }
+      // The chapter bar may have moved or resized. At most once per frame.
+      if (this.overlayAnchor && !syncPending) {
+        syncPending = true;
+        requestAnimationFrame(() => {
+          syncPending = false;
+          this.syncOverlayPosition();
+        });
+      }
     });
 
     watchForSlider();
+  }
+
+  /** (Re)create one colored element per segment inside the overlay. */
+  renderSegments() {
+    const overlay = this.sliderSegmentsOverlay;
+    const videoDuration = this.video.duration;
+
+    while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
+
+    this.segments.forEach((segment) => {
+      const [start, end] = segment.segment;
+      const barType = barTypes[segment.category] || {
+        color: 'blue'
+      };
+      const elm = document.createElement('ytaf-sb-segment');
+      elm.className = 'ytaf-sponsorblock-segment';
+      elm.style['background-color'] = barType.color;
+      elm.style['left'] = `${(start / videoDuration) * 100.0}%`;
+      elm.style['width'] = `${((end - start) / videoDuration) * 100.0}%`;
+      overlay.appendChild(elm);
+    });
+  }
+
+  /**
+   * With a chapter bar, place the <body>-level overlay exactly over the bar
+   * and hide it whenever the bar isn't visible.
+   */
+  syncOverlayPosition() {
+    const overlay = this.sliderSegmentsOverlay;
+    if (!this.overlayAnchor || !overlay) return;
+    if (overlay.childElementCount !== this.segments.length) {
+      this.renderSegments();
+    }
+
+    // All reads first, then writes, to avoid extra reflows.
+    const connected = this.slider?.isConnected ?? false;
+    const rect = connected ? this.slider.getBoundingClientRect() : null;
+    const hidden = !rect || rect.width === 0 || isHiddenByAncestor(this.slider);
+
+    const sig = hidden
+      ? 'hidden'
+      : `${rect.left}_${rect.top}_${rect.width}_${rect.height}`;
+    if (sig === this.lastOverlaySig) return;
+    this.lastOverlaySig = sig;
+
+    const style = overlay.style;
+    style.display = hidden ? 'none' : '';
+    if (hidden) return;
+    style.left = `${rect.left}px`;
+    style.top = `${rect.top}px`;
+    style.width = `${rect.width}px`;
+    style.height = `${rect.height}px`;
   }
 
   scheduleSkip() {
@@ -261,6 +421,17 @@ class SponsorBlockHandler {
     if (!this.active) {
       console.debug(this.videoID, 'No longer active, ignoring...');
       return;
+    }
+
+    // The player UI may replace the whole progress bar (e.g. when switching
+    // between layouts with and without chapters) out of the observer's sight.
+    if (this.slider && !this.slider.isConnected && !this.sliderInterval) {
+      console.debug('slider detached, watching again');
+      this.sliderObserver?.disconnect();
+      this.watchForSlider?.();
+    } else {
+      // Follow the chapter bar's position (e.g. while controls animate in).
+      this.syncOverlayPosition();
     }
 
     if (this.video.paused) {
@@ -339,6 +510,9 @@ class SponsorBlockHandler {
       this.sliderObserver.disconnect();
       this.sliderObserver = null;
     }
+
+    clearInterval(this.overlaySyncInterval);
+    this.overlaySyncInterval = null;
 
     if (this.sliderSegmentsOverlay) {
       this.sliderSegmentsOverlay.remove();
