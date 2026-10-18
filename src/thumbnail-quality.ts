@@ -101,40 +101,48 @@ async function upgradeBgImg(element: HTMLElement) {
   lazyLoader.src = target.href;
 }
 
+const YT_THUMBNAIL_ELEMENT_TAG = 'YTLR-THUMBNAIL-DETAILS';
+
+// Reused to parse the previous `style` attribute of mutated elements.
+const dummy = document.createElement('div');
+
+function isThumbnail(node: Node): node is HTMLElement {
+  // Cheap tag check first: this runs for every style change on the page.
+  return (
+    node.nodeName === YT_THUMBNAIL_ELEMENT_TAG && node instanceof HTMLElement
+  );
+}
+
 const obs = new MutationObserver((mutations) => {
-  const YT_THUMBNAIL_ELEMENT_TAG = 'ytlr-thumbnail-details';
+  for (const mut of mutations) {
+    if (mut.type === 'attributes') {
+      // handle backgroundImage change
+      // YT re-uses thumbnail elements in its virtual list implementation.
+      const node = mut.target;
+      if (!isThumbnail(node) || node.style.backgroundImage === '') continue;
 
-  const dummy = document.createElement('div');
+      dummy.style.cssText = mut.oldValue ?? '';
+      if (node.style.backgroundImage !== dummy.style.backgroundImage) {
+        upgradeBgImg(node);
+      }
+    } else {
+      // handle element add
+      for (const added of Array.from(mut.addedNodes)) {
+        if (!(added instanceof HTMLElement)) continue;
 
-  // handle backgroundImage change
-  // YT re-uses thumbnail elements in its virtual list implementation.
-  mutations
-    .filter((mut) => mut.type === 'attributes')
-    .map((mut) => [mut.target, mut] as const)
-    .filter((value): value is [HTMLElement, MutationRecord] => {
-      const [node, { oldValue }] = value;
-      dummy.style.cssText = oldValue ?? '';
+        const thumbnails: HTMLElement[] = isThumbnail(added) ? [added] : [];
+        thumbnails.push(
+          ...Array.from(
+            added.getElementsByTagName(YT_THUMBNAIL_ELEMENT_TAG.toLowerCase())
+          ).filter((elem): elem is HTMLElement => elem instanceof HTMLElement)
+        );
 
-      return (
-        node instanceof HTMLElement &&
-        node.matches(YT_THUMBNAIL_ELEMENT_TAG) &&
-        node.style.backgroundImage !== '' &&
-        node.style.backgroundImage !== dummy.style.backgroundImage
-      );
-    })
-    .map(([elem]) => elem)
-    .forEach(upgradeBgImg);
-
-  // handle element add
-  mutations
-    .filter((mut) => mut.type === 'childList')
-    .flatMap((mut) => Array.from(mut.addedNodes))
-    .filter((node) => node instanceof HTMLElement)
-    .flatMap((elem) =>
-      Array.from(elem.querySelectorAll<HTMLElement>(YT_THUMBNAIL_ELEMENT_TAG))
-    )
-    .filter((elem) => elem.style.backgroundImage !== '')
-    .forEach(upgradeBgImg);
+        for (const elem of thumbnails) {
+          if (elem.style.backgroundImage !== '') upgradeBgImg(elem);
+        }
+      }
+    }
+  }
 });
 
 function enableObserver() {
@@ -151,6 +159,9 @@ import { configRead, configAddChangeListener } from './config';
 
 if (configRead('upgradeThumbnails')) enableObserver();
 
-configAddChangeListener('upgradeThumbnails', (value) =>
-  value ? enableObserver() : obs.disconnect()
+// The listener receives the change event, not the new value.
+configAddChangeListener('upgradeThumbnails', (evt) =>
+  (evt as CustomEvent<{ newValue: boolean }>).detail.newValue
+    ? enableObserver()
+    : obs.disconnect()
 );

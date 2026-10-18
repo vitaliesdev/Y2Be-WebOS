@@ -1,34 +1,16 @@
-import kindOf from 'which-builtin-type';
-
 import { configRead } from './config';
+import { addJSONParseFilter } from './hooks/json-parse';
 
-function isObject(value: unknown): value is object {
-  // @ts-expect-error - bad types
-  return kindOf(value) === 'Object';
-}
+addJSONParseFilter((res) => {
+  if (!configRead('removeEndscreen')) return;
 
-type JSONReviver = Parameters<typeof JSON.parse>[1];
-
-const originalParse = JSON.parse;
-
-function jsonParse(str: string, reviver?: JSONReviver) {
-  const res = originalParse(str, reviver) as unknown;
-
-  if (!configRead('removeEndscreen')) {
-    return res;
-  }
-
+  const endscreen = res.endscreen;
   if (
-    isObject(res) &&
-    'endscreen' in res &&
-    isObject(res.endscreen) &&
-    'endscreenRenderer' in res.endscreen
+    endscreen !== null &&
+    typeof endscreen === 'object' &&
+    'endscreenRenderer' in endscreen
   ) {
-    console.debug('Removed endscreen from JSON response', res.endscreen);
+    console.debug('Removed endscreen from JSON response', endscreen);
     delete res.endscreen;
   }
-
-  return res;
-}
-
-JSON.parse = jsonParse;
+});

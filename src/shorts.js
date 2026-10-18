@@ -1,20 +1,13 @@
-/* eslint no-redeclare: 0 */
-/* global fetch:writable */
 import { configRead } from './config';
+import { addJSONParseFilter } from './hooks/json-parse';
 import { removeShorts } from './shorts-filter';
 
-const origParse = JSON.parse;
-JSON.parse = function () {
-  const r = origParse.apply(this, arguments);
-  if (!configRead('removeShorts')) {
-    return r;
-  }
+addJSONParseFilter((r) => {
+  if (!configRead('removeShorts')) return;
 
-  // Covers home, search, subscriptions and their pagination.
+  // Covers home, search, subscriptions, their pagination and the sidebar.
   const removed = removeShorts(r);
   if (removed) {
     console.info(`[shorts] Removed ${removed} Shorts element(s)`);
   }
-
-  return r;
-};
+});
