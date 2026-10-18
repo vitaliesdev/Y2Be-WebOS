@@ -1,6 +1,7 @@
 import sha256 from 'tiny-sha256';
-import { configRead } from './config';
+import { configAddChangeListener, configRead } from './config';
 import { showNotification } from './ui';
+import { findNextSegment, getSkipDelay } from './sponsorblock-schedule';
 
 // Copied from https://github.com/ajayyy/SponsorBlock/blob/9392d16617d2d48abb6125c00e2ff6042cb7bebe/src/config.ts#L179-L233
 const barTypes = {
@@ -41,6 +42,17 @@ const barTypes = {
   }
 };
 
+// Maps each SponsorBlock category to the config option that enables skipping it.
+const categoryConfigKeys = {
+  sponsor: 'enableSponsorBlockSponsor',
+  intro: 'enableSponsorBlockIntro',
+  outro: 'enableSponsorBlockOutro',
+  interaction: 'enableSponsorBlockInteraction',
+  selfpromo: 'enableSponsorBlockSelfPromo',
+  music_offtopic: 'enableSponsorBlockMusicOfftopic',
+  preview: 'enableSponsorBlockPreview'
+};
+
 const sponsorblockAPI = 'https://sponsorblock.inf.re/api';
 
 class SponsorBlockHandler {
@@ -66,23 +78,39 @@ class SponsorBlockHandler {
 
   async init() {
     const videoHash = sha256(this.videoID).substring(0, 4);
-    const categories = [
-      'sponsor',
-      'intro',
-      'outro',
-      'interaction',
-      'selfpromo',
-      'music_offtopic',
-      'preview'
-    ];
-    const resp = await fetch(
-      `${sponsorblockAPI}/skipSegments/${videoHash}?categories=${encodeURIComponent(
-        JSON.stringify(categories)
-      )}`
-    );
-    const results = await resp.json();
+    const categories = Object.keys(categoryConfigKeys);
 
-    const result = results.find((v) => v.videoID === this.videoID);
+    let results;
+    try {
+      const resp = await fetch(
+        `${sponsorblockAPI}/skipSegments/${videoHash}?categories=${encodeURIComponent(
+          JSON.stringify(categories)
+        )}`
+      );
+
+      // The API responds with 404 when no video matching the hash prefix has segments.
+      if (resp.status === 404) {
+        results = [];
+      } else if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      } else {
+        results = await resp.json();
+      }
+    } catch (err) {
+      console.warn(this.videoID, 'Failed to fetch SponsorBlock segments:', err);
+      return;
+    }
+
+    // The handler may have been destroyed (e.g. user navigated away) while
+    // the request was in flight.
+    if (!this.active) {
+      console.debug(this.videoID, 'Destroyed during fetch, ignoring result');
+      return;
+    }
+
+    const result = Array.isArray(results)
+      ? results.find((v) => v.videoID === this.videoID)
+      : undefined;
     console.debug(this.videoID, 'Got it:', result);
 
     if (!result || !result.segments || !result.segments.length) {
@@ -101,29 +129,15 @@ class SponsorBlockHandler {
   }
 
   getSkippableCategories() {
-    const skippableCategories = [];
-    if (configRead('enableSponsorBlockSponsor')) {
-      skippableCategories.push('sponsor');
-    }
-    if (configRead('enableSponsorBlockIntro')) {
-      skippableCategories.push('intro');
-    }
-    if (configRead('enableSponsorBlockOutro')) {
-      skippableCategories.push('outro');
-    }
-    if (configRead('enableSponsorBlockInteraction')) {
-      skippableCategories.push('interaction');
-    }
-    if (configRead('enableSponsorBlockSelfPromo')) {
-      skippableCategories.push('selfpromo');
-    }
-    if (configRead('enableSponsorBlockMusicOfftopic')) {
-      skippableCategories.push('music_offtopic');
-    }
-    if (configRead('enableSponsorBlockPreview')) {
-      skippableCategories.push('preview');
-    }
-    return skippableCategories;
+    return Object.keys(categoryConfigKeys).filter((category) =>
+      configRead(categoryConfigKeys[category])
+    );
+  }
+
+  /** Re-read the enabled categories from config and reschedule. */
+  updateSkippableCategories() {
+    this.skippableCategories = this.getSkippableCategories();
+    if (this.video && this.segments) this.scheduleSkip();
   }
 
   attachVideo() {
@@ -142,6 +156,9 @@ class SponsorBlockHandler {
     this.video.addEventListener('play', this.scheduleSkipHandler);
     this.video.addEventListener('pause', this.scheduleSkipHandler);
     this.video.addEventListener('timeupdate', this.scheduleSkipHandler);
+    this.video.addEventListener('seeked', this.scheduleSkipHandler);
+    // The skip timeout depends on the playback rate.
+    this.video.addEventListener('ratechange', this.scheduleSkipHandler);
     this.video.addEventListener('durationchange', this.durationChangeHandler);
   }
 
@@ -251,55 +268,51 @@ class SponsorBlockHandler {
       return;
     }
 
-    // Sometimes timeupdate event (that calls scheduleSkip) gets fired right before
-    // already scheduled skip routine below. Let's just look back a little bit
-    // and, in worst case, perform a skip at negative interval (immediately)...
-    const nextSegments = this.segments.filter(
-      (seg) =>
-        seg.segment[0] > this.video.currentTime - 0.3 &&
-        seg.segment[1] > this.video.currentTime - 0.3
+    // Includes a segment the playhead is already inside of (e.g. after a
+    // seek), in which case the skip happens immediately.
+    const segment = findNextSegment(
+      this.segments,
+      this.video.currentTime,
+      this.skippableCategories
     );
-    nextSegments.sort((s1, s2) => s1.segment[0] - s2.segment[0]);
 
-    if (!nextSegments.length) {
+    if (!segment) {
       console.debug(this.videoID, 'No more segments');
       return;
     }
 
-    const [segment] = nextSegments;
-    const [start, end] = segment.segment;
+    const end = segment.segment[1];
+    const delay = getSkipDelay(
+      segment,
+      this.video.currentTime,
+      this.video.playbackRate
+    );
     console.debug(
       this.videoID,
       'Scheduling skip of',
       segment,
       'in',
-      start - this.video.currentTime
+      delay / 1000
     );
 
-    this.nextSkipTimeout = setTimeout(
-      () => {
-        if (this.video.paused) {
-          console.debug(this.videoID, 'Currently paused, ignoring...');
-          return;
-        }
-        if (!this.skippableCategories.includes(segment.category)) {
-          console.debug(
-            this.videoID,
-            'Segment',
-            segment.category,
-            'is not skippable, ignoring...'
-          );
-          return;
-        }
-
-        const skipName = barTypes[segment.category]?.name || segment.category;
-        console.debug(this.videoID, 'Skipping', segment);
-        showNotification(`Skipping ${skipName}`, 2000, 'indigo');
-        this.video.currentTime = end;
+    this.nextSkipTimeout = setTimeout(() => {
+      if (!this.active) return;
+      if (this.video.paused) {
+        console.debug(this.videoID, 'Currently paused, ignoring...');
+        return;
+      }
+      // Guard against a stale timeout (e.g. the user seeked past the segment).
+      if (this.video.currentTime >= end) {
         this.scheduleSkip();
-      },
-      (start - this.video.currentTime) * 1000
-    );
+        return;
+      }
+
+      const skipName = barTypes[segment.category]?.name || segment.category;
+      console.debug(this.videoID, 'Skipping', segment);
+      showNotification(`Skipping ${skipName}`, 2000, 'indigo');
+      this.video.currentTime = end;
+      this.scheduleSkip();
+    }, delay);
   }
 
   destroy() {
@@ -336,6 +349,8 @@ class SponsorBlockHandler {
       this.video.removeEventListener('play', this.scheduleSkipHandler);
       this.video.removeEventListener('pause', this.scheduleSkipHandler);
       this.video.removeEventListener('timeupdate', this.scheduleSkipHandler);
+      this.video.removeEventListener('seeked', this.scheduleSkipHandler);
+      this.video.removeEventListener('ratechange', this.scheduleSkipHandler);
       this.video.removeEventListener(
         'durationchange',
         this.durationChangeHandler
@@ -364,10 +379,29 @@ function uninitializeSponsorblock() {
   window.sponsorblock = null;
 }
 
+function getCurrentURL() {
+  return new URL(location.hash.substring(1), location.href);
+}
+
+function initializeSponsorblock(videoID) {
+  uninitializeSponsorblock();
+
+  if (!configRead('enableSponsorBlock')) {
+    console.info('SponsorBlock disabled, not loading');
+    return;
+  }
+
+  const handler = new SponsorBlockHandler(videoID);
+  window.sponsorblock = handler;
+  handler.init().catch((err) => {
+    console.warn(videoID, 'SponsorBlock init failed:', err);
+  });
+}
+
 window.addEventListener(
   'hashchange',
   () => {
-    const newURL = new URL(location.hash.substring(1), location.href);
+    const newURL = getCurrentURL();
     // uninitialize sponsorblock when not on `/watch` path, to prevent
     // it from attaching to playback preview video element loaded on
     // home page
@@ -391,15 +425,29 @@ window.addEventListener(
     );
 
     if (needsReload) {
-      uninitializeSponsorblock();
-
-      if (configRead('enableSponsorBlock')) {
-        window.sponsorblock = new SponsorBlockHandler(videoID);
-        window.sponsorblock.init();
-      } else {
-        console.info('SponsorBlock disabled, not loading');
-      }
+      initializeSponsorblock(videoID);
     }
   },
   false
 );
+
+// Apply config changes to the video currently playing, without waiting for
+// the next navigation.
+configAddChangeListener('enableSponsorBlock', (evt) => {
+  if (!evt.detail.newValue) {
+    uninitializeSponsorblock();
+    return;
+  }
+
+  const url = getCurrentURL();
+  const videoID = url.searchParams.get('v');
+  if (url.pathname === '/watch' && videoID && !window.sponsorblock) {
+    initializeSponsorblock(videoID);
+  }
+});
+
+for (const key of Object.values(categoryConfigKeys)) {
+  configAddChangeListener(key, () => {
+    window.sponsorblock?.updateSkippableCategories();
+  });
+}
