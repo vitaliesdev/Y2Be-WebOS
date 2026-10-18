@@ -1,4 +1,4 @@
-.ytaf-ui-container {
+.y2be-ui-container {
   position: absolute;
   top: 10%;
   left: 10%;
@@ -15,28 +15,28 @@
   z-index: 1000;
 }
 
-.ytaf-ui-container :focus {
+.y2be-ui-container :focus {
   outline: 4px red solid;
   background-color: rgba(240, 248, 255, 0.511);
 }
 
-.ytaf-ui-container h1 {
+.y2be-ui-container h1 {
   margin: 0;
   margin-bottom: 0.5em;
   text-align: center;
 }
 
-.ytaf-ui-container input[type='checkbox'] {
+.y2be-ui-container input[type='checkbox'] {
   width: 1.5rem;
   height: 1.3rem;
 }
 
-.ytaf-ui-container label {
+.y2be-ui-container label {
   display: block;
   font-size: 1.3rem;
 }
 
-.ytaf-notification-container {
+.y2be-notification-container {
   position: absolute;
   right: 10px;
   bottom: 10px;
@@ -44,7 +44,7 @@
   z-index: 1200;
 }
 
-.ytaf-notification-container .message {
+.y2be-notification-container .message {
   background: rgba(0, 0, 0, 0.7);
   color: white;
   padding: 1em;
@@ -57,14 +57,14 @@
   float: right;
 }
 
-.ytaf-notification-container .message-hidden {
+.y2be-notification-container .message-hidden {
   opacity: 0;
   margin: 0 0.5em;
   padding: 0 1em;
   line-height: 0;
 }
 
-.ytaf-sponsorblock-segment-container {
+.y2be-sponsorblock-segment-container {
   top: 0%;
   height: 100%;
   width: 100%;
@@ -76,18 +76,18 @@
 /* Fix: progress bar w/ chapter markers uses a different layout */
 [idomkey='player-bar-renderer']
   :not([idomkey='slider'])
-  .ytaf-sponsorblock-segment-container {
+  .y2be-sponsorblock-segment-container {
   top: 0.1875rem;
   height: 75%;
 }
 
 /* Expand to overflow progress bar when focused */
-[idomkey='progress-bar'].zylon-focus .ytaf-sponsorblock-segment-container {
+[idomkey='progress-bar'].zylon-focus .y2be-sponsorblock-segment-container {
   top: -25%;
   height: 150%;
 }
 
-.ytaf-sponsorblock-segment {
+.y2be-sponsorblock-segment {
   opacity: 0.7;
   height: 100%;
   width: 100%;
@@ -102,11 +102,11 @@
   overflow: unset !important;
 }
 
-.ytaf-ui-sponsor {
+.y2be-ui-sponsor {
   font-size: 0.7rem;
 }
 
-.ytaf-ui-version {
+.y2be-ui-version {
   font-size: 0.7rem;
   color: #656565;
   position: absolute;
@@ -114,7 +114,7 @@
   bottom: 1rem;
 }
 
-.ytaf-ui-watchControl-overlayMessage {
+.y2be-ui-watchControl-overlayMessage {
   position: fixed;
   top: 35%;
   left: 50%;

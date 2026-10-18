@@ -6,39 +6,7 @@ type TypedEventPartial<T extends EventTarget, U> = {
 type BaseTypedEvent<T extends EventTarget, E extends Event, U> = E &
   TypedEventPartial<T, U>;
 
-type EventInstanceType<T, O> = T extends abstract new (
-  type: string,
-  options?: O
-) => infer R
-  ? R
-  : never;
-
-type EventOptionsType<T> = T extends new (
-  type: string,
-  options?: infer O
-) => Event
-  ? O
-  : never;
-
-export function asTypedEvent<
-  const E extends Event,
-  const A = EventInit
->(event: { new (type: string, options?: A): E }) {
-  return event as {
-    new <
-      T extends EventTarget,
-      const U,
-      const O extends EventOptionsType<typeof event>
-    >(
-      type: U,
-      options?: O
-    ): BaseTypedEvent<T, EventInstanceType<typeof event, O>, U>;
-    prototype: BaseTypedEvent<EventTarget, E, string>;
-  };
-}
-
 export type TypedEvent<T extends EventTarget, U> = BaseTypedEvent<T, Event, U>;
-export const TypedEvent = asTypedEvent(Event);
 
 export type TypedCustomEvent<
   D,

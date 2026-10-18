@@ -1,15 +1,5 @@
 import './domrect-polyfill';
-
-import { handleLaunch } from './utils';
-
-document.addEventListener(
-  'webOSRelaunch',
-  (evt) => {
-    console.info('RELAUNCH:', evt, window.launchParams);
-    handleLaunch(evt.detail);
-  },
-  true
-);
+import './relaunch';
 
 import './app_api/index';
 import './adblock.js';
@@ -28,6 +18,5 @@ import './watch.js';
 import './video-quality';
 import './lang-settings-fix';
 import './remove-endscreen';
-import './hooks';
 import './block-webos-cast';
 import './auto-account-select';

@@ -1,3 +1,5 @@
+import { configRead } from '../config';
+
 function isPrimitive(
   value: unknown
 ): value is string | number | boolean | null | undefined | symbol | bigint {
@@ -14,10 +16,7 @@ function stringify(
   replacer?: FunctionReplacer | WhitelistReplacer,
   space?: string | number
 ): string {
-  if (!isPrimitive(value)) {
-    // TODO: add below to a dump-level logger
-    // console.debug('JSON.stringify', value, replacer, space);
-
+  if (!isPrimitive(value) && configRead('enableAdBlock')) {
     const root = value as Record<string, unknown>;
     const playbackContext = root.playbackContext as unknown;
     const ctx = isPrimitive(playbackContext)

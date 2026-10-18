@@ -33,7 +33,7 @@ class Watch {
     };
 
     setTime();
-    setTimeout(() => {
+    this.#timer = setTimeout(() => {
       setTime();
       this.#timer = setInterval(setTime, 60000);
     }, nextSeg);
@@ -51,6 +51,8 @@ class Watch {
 
   async playerEvents() {
     const player = await requireElement(this.#PLAYER_SELECTOR, HTMLElement);
+    // The clock may have been turned off while waiting.
+    if (!this.#watch || !document.body.contains(this.#watch)) return;
     this.playerAppear(player);
   }
 
@@ -66,6 +68,8 @@ class Watch {
   }
 
   destroy() {
+    // Either the first-minute timeout or the interval.
+    clearTimeout(this.#timer);
     clearInterval(this.#timer);
     this.#watch?.remove();
     this.#attrChanges?.disconnect();

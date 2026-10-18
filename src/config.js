@@ -1,114 +1,58 @@
-const CONFIG_KEY = 'ytaf-configuration';
+import { t } from './i18n';
 
-const configOptions = new Map([
-  ['enableAdBlock', { default: true, desc: 'Enable ad blocking' }],
-  ['upgradeThumbnails', { default: false, desc: 'Upgrade thumbnail quality' }],
-  ['removeShorts', { default: false, desc: 'Remove Shorts' }],
-  ['enableSponsorBlock', { default: true, desc: 'Enable SponsorBlock' }],
-  [
-    'enableSponsorBlockSponsor',
-    { default: true, desc: 'Skip sponsor segments' }
-  ],
-  ['enableSponsorBlockIntro', { default: true, desc: 'Skip intro segments' }],
-  ['enableSponsorBlockOutro', { default: true, desc: 'Skip outro segments' }],
+const CONFIG_KEY = 'y2be-config';
+// Settings saved by older versions, read once so they aren't lost.
+const LEGACY_CONFIG_KEY = 'ytaf-configuration';
+
+/**
+ * Options in the order they appear in the settings panel. Labels live in
+ * i18n.js under `opt.<key>`. Options with a `group` are shown indented under
+ * the option of that name.
+ * @type {Map<string, { default: boolean, group?: string }>}
+ */
+export const configOptions = new Map([
+  ['enableAdBlock', { default: true }],
+  ['removeShorts', { default: false }],
+  ['upgradeThumbnails', { default: false }],
+  ['hideLogo', { default: false }],
+  ['showWatch', { default: false }],
+  ['forceHighResVideo', { default: false }],
+  ['removeEndscreen', { default: false }],
+  ['autoAccountSelect', { default: false }],
+  ['chapterSkipButtons', { default: true }],
+  ['refreshButton', { default: true }],
+  ['enableSponsorBlock', { default: true }],
+  ['enableSponsorBlockSponsor', { default: true, group: 'enableSponsorBlock' }],
+  ['enableSponsorBlockIntro', { default: true, group: 'enableSponsorBlock' }],
+  ['enableSponsorBlockOutro', { default: true, group: 'enableSponsorBlock' }],
   [
     'enableSponsorBlockInteraction',
-    {
-      default: true,
-      desc: 'Skip interaction reminder segments'
-    }
+    { default: true, group: 'enableSponsorBlock' }
   ],
   [
     'enableSponsorBlockSelfPromo',
-    {
-      default: true,
-      desc: 'Skip self promotion segments'
-    }
+    { default: true, group: 'enableSponsorBlock' }
   ],
   [
     'enableSponsorBlockMusicOfftopic',
-    {
-      default: true,
-      desc: 'Skip non-music segments in music videos'
-    }
+    { default: true, group: 'enableSponsorBlock' }
   ],
-  [
-    'enableSponsorBlockPreview',
-    {
-      default: false,
-      desc: 'Skip recaps and previews'
-    }
-  ],
-  [
-    'hideLogo',
-    {
-      default: false,
-      desc: 'Hide YouTube logo'
-    }
-  ],
-  [
-    'showWatch',
-    {
-      default: false,
-      desc: 'Display time in UI'
-    }
-  ],
-  [
-    'forceHighResVideo',
-    {
-      default: false,
-      desc: 'Force max resolution video playback'
-    }
-  ],
-  [
-    'removeEndscreen',
-    {
-      default: false,
-      desc: 'Remove end screens from video'
-    }
-  ],
-  [
-    'autoAccountSelect',
-    {
-      default: false,
-      desc: 'Bypass initial account selection on startup'
-    }
-  ],
-  [
-    'chapterSkipButtons',
-    {
-      default: true,
-      desc: 'Skip chapters with [RED]/[YELLOW] buttons'
-    }
-  ],
-  [
-    'refreshButton',
-    {
-      default: true,
-      desc: 'Refresh page with [RED] button (outside the player)'
-    }
-  ]
+  ['enableSponsorBlockPreview', { default: false, group: 'enableSponsorBlock' }]
 ]);
 
-const defaultConfig = (() => {
-  let ret = {};
-  for (const [k, v] of configOptions) {
-    ret[k] = v.default;
-  }
-  return ret;
-})();
+const defaultConfig = Object.fromEntries(
+  Array.from(configOptions, ([k, v]) => [k, v.default])
+);
 
-/** @type {Record<string, DocumentFragment>} as const */
-const configFrags = (() => {
-  let ret = {};
-  for (const k of configOptions.keys()) {
-    ret[k] = new DocumentFragment();
-  }
-  return ret;
-})();
+/** @type {Record<string, DocumentFragment>} */
+const configFrags = Object.fromEntries(
+  Array.from(configOptions.keys(), (k) => [k, new DocumentFragment()])
+);
 
 function loadStoredConfig() {
-  const storage = window.localStorage.getItem(CONFIG_KEY);
+  const storage =
+    window.localStorage.getItem(CONFIG_KEY) ??
+    window.localStorage.getItem(LEGACY_CONFIG_KEY);
 
   if (storage === null) {
     console.info('Config not set; using defaults.');
@@ -124,53 +68,37 @@ function loadStoredConfig() {
 }
 
 // Use defaultConfig as a prototype so writes to localConfig don't change it.
-let localConfig = loadStoredConfig() ?? Object.create(defaultConfig);
+const localConfig = Object.assign(
+  Object.create(defaultConfig),
+  loadStoredConfig()
+);
 
-function configExists(key) {
-  return configOptions.has(key);
+function assertExists(key) {
+  if (!configOptions.has(key)) {
+    throw new Error('unknown config key: ' + key);
+  }
 }
 
 export function configGetDesc(key) {
-  if (!configExists(key)) {
-    throw new Error('tried to get desc for unknown config key: ' + key);
-  }
-
-  return configOptions.get(key).desc;
+  assertExists(key);
+  return t('opt.' + key);
 }
 
 export function configRead(key) {
-  if (!configExists(key)) {
-    throw new Error('tried to read unknown config key: ' + key);
-  }
-
-  if (localConfig[key] === undefined) {
-    console.warn(
-      'Populating key',
-      key,
-      'with default value',
-      defaultConfig[key]
-    );
-
-    localConfig[key] = defaultConfig[key];
-  }
-
+  assertExists(key);
   return localConfig[key];
 }
 
 export function configWrite(key, value) {
-  if (!configExists(key)) {
-    throw new Error('tried to write unknown config key: ' + key);
-  }
+  assertExists(key);
 
-  const oldValue =
-    localConfig[key] !== undefined ? localConfig[key] : defaultConfig[key];
-
+  const oldValue = localConfig[key];
   console.info('Changing key', key, 'from', oldValue, 'to', value);
   localConfig[key] = value;
-  window.localStorage[CONFIG_KEY] = JSON.stringify(localConfig);
+  window.localStorage.setItem(CONFIG_KEY, JSON.stringify({ ...localConfig }));
 
   configFrags[key].dispatchEvent(
-    new CustomEvent('ytafConfigChange', {
+    new CustomEvent('configchange', {
       detail: { key, newValue: value, oldValue }
     })
   );
@@ -179,21 +107,8 @@ export function configWrite(key, value) {
 /**
  * Add a listener for changes in the value of a specified config option
  * @param {string} key Config option to monitor
- * @param {(evt: Event) => void} callback Function to be called on change
+ * @param {(evt: CustomEvent<{ key: string, newValue: boolean, oldValue: boolean }>) => void} callback Function to be called on change
  */
 export function configAddChangeListener(key, callback) {
-  const frag = configFrags[key];
-
-  frag.addEventListener('ytafConfigChange', callback);
-}
-
-/**
- * Remove a listener for changes in the value of a specified config option
- * @param {string} key Config option to monitor
- * @param {(evt: Event) => void} callback Function to be called on change
- */
-export function configRemoveChangeListener(key, callback) {
-  const frag = configFrags[key];
-
-  frag.removeEventListener('ytafConfigChange', callback);
+  configFrags[key].addEventListener('configchange', callback);
 }

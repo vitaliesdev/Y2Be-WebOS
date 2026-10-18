@@ -6,13 +6,6 @@ import { addJSONParseFilter } from './hooks/json-parse';
  * https://github.com/uBlockOrigin/uAssets/blob/master/filters/filters.txt
  */
 addJSONParseFilter((r) => {
-  // TODO: add below to a dump-level logger
-  // if (
-  //   !(Object.keys(r).length === 1 && 'data' in r && typeof r.data === 'boolean')
-  // ) {
-  //   console.debug('JSON.parse', r);
-  // }
-
   if (!configRead('enableAdBlock')) {
     return;
   }

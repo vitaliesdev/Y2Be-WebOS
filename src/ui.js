@@ -1,83 +1,47 @@
-/*global __YTAF_VERSION__*/
+/*global __APP_VERSION__*/
 import {
   configAddChangeListener,
+  configGetDesc,
+  configOptions,
   configRead,
-  configWrite,
-  configGetDesc
+  configWrite
 } from './config.js';
-import './ui.css';
+import { APP_NAME, t } from './i18n';
+import { isWatchPage } from './nav';
 import { requireElement } from './player_api/helpers';
+import { onColorKey } from './remote-keys';
+import './ui.css';
 
-const ARROW_KEY_CODE = { 37: 'left', 38: 'up', 39: 'right', 40: 'down' };
+const KEY_UP = 38;
+const KEY_DOWN = 40;
+const KEY_OK = 13;
+const KEY_BACK = [27, 461];
 
 /**
- * Move focus between the options panel's checkboxes. The panel is a single
- * vertical list, so only up/down do anything.
+ * Move focus between the settings panel's checkboxes (a single vertical list).
  * @param {HTMLElement} container
- * @param {'left' | 'up' | 'right' | 'down'} direction
+ * @param {1 | -1} step
  */
-function navigate(container, direction) {
-  if (direction !== 'up' && direction !== 'down') return;
-
+function moveFocus(container, step) {
   const items = Array.from(container.querySelectorAll('input'));
   if (!items.length) return;
 
   const current = items.indexOf(document.activeElement);
-  let next;
-  if (current === -1) {
-    next = direction === 'down' ? 0 : items.length - 1;
-  } else {
-    next = current + (direction === 'down' ? 1 : -1);
-    if (next < 0 || next >= items.length) return;
-  }
+  const next =
+    current === -1 ? (step === 1 ? 0 : items.length - 1) : current + step;
+  if (next < 0 || next >= items.length) return;
 
-  const target = items[next];
-  target.focus();
-  if (typeof target.scrollIntoViewIfNeeded === 'function') {
-    target.scrollIntoViewIfNeeded(false);
-  } else {
-    target.scrollIntoView(false);
-  }
-}
-
-const colorCodeMap = new Map([
-  [403, 'red'],
-
-  [404, 'green'],
-  [172, 'green'],
-
-  [405, 'yellow'],
-  [170, 'yellow'],
-
-  [406, 'blue'],
-  [167, 'blue'],
-  [191, 'blue']
-]);
-
-/**
- * Returns the name of the color button associated with a code or null if not a color button.
- * @param {number} charCode KeyboardEvent.charCode property from event
- * @returns {string | null} Color name or null
- */
-function getKeyColor(charCode) {
-  if (colorCodeMap.has(charCode)) {
-    return colorCodeMap.get(charCode);
-  }
-
-  return null;
+  items[next].focus();
+  items[next].scrollIntoViewIfNeeded(false);
 }
 
 function createConfigCheckbox(key) {
   const elmInput = document.createElement('input');
   elmInput.type = 'checkbox';
   elmInput.checked = configRead(key);
-
-  /** @type {(evt: Event) => void} */
-  const changeHandler = (evt) => {
+  elmInput.addEventListener('change', (evt) => {
     configWrite(key, evt.target.checked);
-  };
-
-  elmInput.addEventListener('change', changeHandler);
+  });
 
   configAddChangeListener(key, (evt) => {
     elmInput.checked = evt.detail.newValue;
@@ -86,7 +50,7 @@ function createConfigCheckbox(key) {
   const elmLabel = document.createElement('label');
   elmLabel.appendChild(elmInput);
   // Use non-breaking space (U+00A0)
-  elmLabel.appendChild(document.createTextNode('\u00A0' + configGetDesc(key)));
+  elmLabel.appendChild(document.createTextNode(' ' + configGetDesc(key)));
 
   return elmLabel;
 }
@@ -94,47 +58,28 @@ function createConfigCheckbox(key) {
 function createOptionsPanel() {
   const elmContainer = document.createElement('div');
 
-  elmContainer.classList.add('ytaf-ui-container');
+  elmContainer.classList.add('y2be-ui-container');
   elmContainer.style['display'] = 'none';
   elmContainer.setAttribute('tabindex', 0);
 
   elmContainer.addEventListener(
-    'focus',
-    () => console.debug('Options panel focused!'),
-    true
-  );
-  elmContainer.addEventListener(
-    'blur',
-    () => console.debug('Options panel blurred!'),
-    true
-  );
-
-  elmContainer.addEventListener(
     'keydown',
     (evt) => {
-      console.debug('Options panel key event:', evt.type, evt.charCode);
-
-      if (getKeyColor(evt.charCode) === 'green') {
-        return;
-      }
-
-      if (evt.keyCode in ARROW_KEY_CODE) {
-        navigate(elmContainer, ARROW_KEY_CODE[evt.keyCode]);
-      } else if (evt.keyCode === 13) {
-        // "OK" button
-
+      if (evt.keyCode === KEY_UP) {
+        moveFocus(elmContainer, -1);
+      } else if (evt.keyCode === KEY_DOWN) {
+        moveFocus(elmContainer, 1);
+      } else if (evt.keyCode === KEY_OK) {
         /**
-         * The YouTube app generates these "OK" events from clicks (including
-         * with the Magic Remote), and we don't want to send a duplicate click
-         * event for those. Youtube uses the `Event` class instead of
-         * `KeyboardEvent` so we check for that.
-         * See issue #143 and #200 for context.
+         * The app generates these "OK" events from clicks (including with the
+         * Magic Remote), and we don't want to send a duplicate click event for
+         * those. It uses the `Event` class instead of `KeyboardEvent`, so
+         * check for that.
          */
         if (evt instanceof KeyboardEvent) {
           document.activeElement.click();
         }
-      } else if (evt.keyCode === 27) {
-        // Back button
+      } else if (KEY_BACK.includes(evt.keyCode)) {
         showOptionsPanel(false);
       }
 
@@ -145,43 +90,32 @@ function createOptionsPanel() {
   );
 
   const elmHeading = document.createElement('h1');
-  elmHeading.textContent = 'webOS YouTube Extended';
+  elmHeading.textContent = APP_NAME;
   elmContainer.appendChild(elmHeading);
 
-  elmContainer.appendChild(createConfigCheckbox('enableAdBlock'));
-  elmContainer.appendChild(createConfigCheckbox('upgradeThumbnails'));
-  elmContainer.appendChild(createConfigCheckbox('hideLogo'));
-  elmContainer.appendChild(createConfigCheckbox('showWatch'));
-  elmContainer.appendChild(createConfigCheckbox('removeShorts'));
-  elmContainer.appendChild(createConfigCheckbox('forceHighResVideo'));
-  elmContainer.appendChild(createConfigCheckbox('removeEndscreen'));
-  elmContainer.appendChild(createConfigCheckbox('autoAccountSelect'));
-  elmContainer.appendChild(createConfigCheckbox('chapterSkipButtons'));
-  elmContainer.appendChild(createConfigCheckbox('refreshButton'));
-  elmContainer.appendChild(createConfigCheckbox('enableSponsorBlock'));
-
-  const elmBlock = document.createElement('blockquote');
-
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockSponsor'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockIntro'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockOutro'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockInteraction'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockSelfPromo'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockMusicOfftopic'));
-  elmBlock.appendChild(createConfigCheckbox('enableSponsorBlockPreview'));
-
-  elmContainer.appendChild(elmBlock);
+  /** @type {Record<string, HTMLElement>} */
+  const groups = {};
+  for (const [key, option] of configOptions) {
+    const checkbox = createConfigCheckbox(key);
+    if (option.group) {
+      if (!groups[option.group]) {
+        groups[option.group] = document.createElement('blockquote');
+        elmContainer.appendChild(groups[option.group]);
+      }
+      groups[option.group].appendChild(checkbox);
+    } else {
+      elmContainer.appendChild(checkbox);
+    }
+  }
 
   const elmSponsorLink = document.createElement('small');
-  elmSponsorLink.className = 'ytaf-ui-sponsor';
-  elmSponsorLink.textContent =
-    'Sponsor segments skipping - https://sponsor.ajay.app';
+  elmSponsorLink.className = 'y2be-ui-sponsor';
+  elmSponsorLink.textContent = t('panel.sponsorCredit');
   elmContainer.appendChild(elmSponsorLink);
 
   const version = document.createElement('div');
-  version.className = 'ytaf-ui-version';
-  version.textContent = `v${__YTAF_VERSION__}`;
-
+  version.className = 'y2be-ui-version';
+  version.textContent = `v${__APP_VERSION__}`;
   elmContainer.appendChild(version);
 
   return elmContainer;
@@ -193,79 +127,34 @@ document.body.appendChild(optionsPanel);
 let optionsPanelVisible = false;
 
 /**
- * Show or hide the options panel.
- * @param {boolean} [visible=true] Whether to show the options panel.
+ * Show or hide the settings panel.
+ * @param {boolean} visible
  */
 function showOptionsPanel(visible) {
-  visible ??= true;
+  if (visible === optionsPanelVisible) return;
 
-  if (visible && !optionsPanelVisible) {
-    console.debug('Showing and focusing options panel!');
-    optionsPanel.style.display = 'block';
-    optionsPanel.focus();
-    optionsPanelVisible = true;
-  } else if (!visible && optionsPanelVisible) {
-    console.debug('Hiding options panel!');
-    optionsPanel.style.display = 'none';
-    optionsPanel.blur();
-    optionsPanelVisible = false;
-  }
+  optionsPanel.style.display = visible ? 'block' : 'none';
+  if (visible) optionsPanel.focus();
+  else optionsPanel.blur();
+  optionsPanelVisible = visible;
 }
 
-window.ytaf_showOptionsPanel = showOptionsPanel;
-
-const eventHandler = (evt) => {
-  console.debug(
-    'Key event:',
-    evt.type,
-    evt.charCode,
-    evt.keyCode,
-    evt.defaultPrevented
-  );
-
-  if (getKeyColor(evt.charCode) === 'green') {
-    console.debug('Taking over!');
-
-    evt.preventDefault();
-    evt.stopPropagation();
-
-    if (evt.type === 'keydown') {
-      // Toggle visibility.
-      showOptionsPanel(!optionsPanelVisible);
-    }
-    return false;
-  } else if (getKeyColor(evt.charCode) === 'blue') {
-    evt.preventDefault();
-    evt.stopPropagation();
-
-    if (evt.type === 'keydown') {
-      // Toggle Audio-Only mode.
-      initAudioOnlyToggle();
-    }
-    return false;
-  }
-  return true;
-};
-
-document.addEventListener('keydown', eventHandler, true);
-document.addEventListener('keypress', eventHandler, true);
-document.addEventListener('keyup', eventHandler, true);
+onColorKey('green', () => showOptionsPanel(!optionsPanelVisible));
+onColorKey('blue', () => toggleAudioOnly(), isWatchPage);
 
 const COLOR_MAP = {
-  red: 'rgba(255, 0, 0, 0.9)',
   green: 'rgba(0, 162, 0, 0.9)',
-  yellow: 'rgba(255, 255, 0, 0.9)',
   blue: 'rgba(0, 128, 255, 0.9)',
-  grey: 'rgba(255, 255, 255, 0.5)',
-  none: 'rgba(0, 0, 0, 0)'
+  indigo: 'rgba(75, 0, 130, 0.9)',
+  grey: 'rgba(255, 255, 255, 0.5)'
 };
 
 export function showNotification(text, time = 3000, color = 'grey') {
-  if (!document.querySelector('.ytaf-notification-container')) {
-    console.debug('Adding notification container');
-    const c = document.createElement('div');
-    c.classList.add('ytaf-notification-container');
-    document.body.appendChild(c);
+  let container = document.querySelector('.y2be-notification-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.classList.add('y2be-notification-container');
+    document.body.appendChild(container);
   }
 
   const elm = document.createElement('div');
@@ -273,9 +162,9 @@ export function showNotification(text, time = 3000, color = 'grey') {
   elmInner.innerText = text;
   elmInner.classList.add('message');
   elmInner.classList.add('message-hidden');
-  elm.appendChild(elmInner);
-  document.querySelector('.ytaf-notification-container').appendChild(elm);
   elmInner.style.borderColor = COLOR_MAP[color] || color;
+  elm.appendChild(elmInner);
+  container.appendChild(elm);
 
   setTimeout(() => {
     elmInner.classList.remove('message-hidden');
@@ -288,9 +177,7 @@ export function showNotification(text, time = 3000, color = 'grey') {
   }, time);
 }
 
-/**
- * Initialize ability to hide YouTube logo in top right corner.
- */
+/** Option to hide the site logo in the top right corner. */
 function initHideLogo() {
   const style = document.createElement('style');
   document.head.appendChild(style);
@@ -308,46 +195,36 @@ function initHideLogo() {
   });
 }
 
+/**
+ * The app adds `app-quality-root` to <body> on some TVs, which turns off the
+ * player's transparency effects. Keep them.
+ */
 function applyUIFixes() {
-  try {
-    const bodyClasses = document.body.classList;
-
-    const observer = new MutationObserver(function bodyClassCallback(
-      _records,
-      _observer
-    ) {
-      try {
-        if (bodyClasses.contains('app-quality-root')) {
-          bodyClasses.remove('app-quality-root');
-        }
-      } catch (e) {
-        console.error('error in <body> class observer callback:', e);
-      }
-    });
-
-    observer.observe(document.body, {
-      subtree: false,
-      childList: false,
-      attributes: true,
-      attributeFilter: ['class'],
-      characterData: false
-    });
-  } catch (e) {
-    console.error('error setting up <body> class observer:', e);
-  }
+  const bodyClasses = document.body.classList;
+  new MutationObserver(() => {
+    if (bodyClasses.contains('app-quality-root')) {
+      bodyClasses.remove('app-quality-root');
+    }
+  }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 }
 
+const AUDIO_OVERLAY_SELECTOR = '.ytLrAudioPlayerOverlayAudioMode';
+const AUDIO_MESSAGE_CLASS = 'y2be-ui-watchControl-overlayMessage';
+
 let audioOnlyEnabled = false;
+/** @type {MutationObserver | null} */
 let overlayObserver = null;
 
-async function initAudioOnlyToggle() {
-  const elVideo = await requireElement('video', HTMLVideoElement);
-
+/** Hide the video and keep only the sound (blue button). */
+async function toggleAudioOnly() {
   audioOnlyEnabled = !audioOnlyEnabled;
-  elVideo.style.visibility = audioOnlyEnabled ? 'hidden' : '';
+  const enabled = audioOnlyEnabled;
+  showNotification(t(enabled ? 'audio.on' : 'audio.off'), 2000, 'blue');
 
-  const AUDIO_OVERLAY_SELECTOR = '.ytLrAudioPlayerOverlayAudioMode';
-  const YTAF_OVERLAY_CLASS = 'ytaf-ui-watchControl-overlayMessage';
+  const video = await requireElement('video', HTMLVideoElement);
+  // Pressed again while waiting: the later press wins.
+  if (enabled !== audioOnlyEnabled) return;
+  video.style.visibility = enabled ? 'hidden' : '';
 
   const applyAudioOverlayFilter = () => {
     const node = document.querySelector(AUDIO_OVERLAY_SELECTOR);
@@ -358,56 +235,42 @@ async function initAudioOnlyToggle() {
       node.style.removeProperty('filter');
     }
   };
-  applyAudioOverlayFilter();
 
-  showNotification(
-    `Audio-Only mode: ${audioOnlyEnabled ? 'Enabled' : 'Disabled'}`,
-    2000,
-    'blue'
-  );
+  const controls = await requireElement('[idomkey="controls"]', HTMLElement);
+  if (enabled !== audioOnlyEnabled) return;
 
-  const controlsContainer = await requireElement(
-    '[idomkey="controls"]',
-    HTMLElement
-  );
-
-  const updateOverlay = (root = controlsContainer) => {
-    let overlay = root.querySelector(`.${YTAF_OVERLAY_CLASS}`);
-
+  const updateOverlay = () => {
+    let message = controls.querySelector(`.${AUDIO_MESSAGE_CLASS}`);
     if (!audioOnlyEnabled) {
-      overlay?.remove();
+      message?.remove();
       return;
     }
+    if (message) return;
 
-    if (overlay) return;
-
-    overlay = Object.assign(document.createElement('div'), {
-      textContent: 'Audio-Only Mode Enabled - Press [BLUE] to toggle',
-      className: YTAF_OVERLAY_CLASS
-    });
-    root.insertBefore(overlay, root.firstChild);
+    message = document.createElement('div');
+    message.textContent = t('audio.overlay');
+    message.className = AUDIO_MESSAGE_CLASS;
+    controls.insertBefore(message, controls.firstChild);
   };
+
+  applyAudioOverlayFilter();
   updateOverlay();
 
-  if (overlayObserver) overlayObserver.disconnect();
-  overlayObserver = new MutationObserver(() => {
-    updateOverlay();
-    applyAudioOverlayFilter();
-  });
-
-  overlayObserver.observe(controlsContainer, {
-    childList: true,
-    subtree: true
-  });
+  overlayObserver?.disconnect();
+  overlayObserver = null;
+  if (enabled) {
+    // The controls get re-rendered; keep the message and filter applied.
+    overlayObserver = new MutationObserver(() => {
+      updateOverlay();
+      applyAudioOverlayFilter();
+    });
+    overlayObserver.observe(controls, { childList: true, subtree: true });
+  }
 }
 
 applyUIFixes();
 initHideLogo();
 
 setTimeout(() => {
-  showNotification(
-    'Press [GREEN] to open YTAF configuration screen',
-    2000,
-    'green'
-  );
-});
+  showNotification(t('hint.openSettings', { app: APP_NAME }), 2000, 'green');
+}, 0);

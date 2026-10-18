@@ -30,12 +30,7 @@ export class ResolveCommandRegistry {
     command: Record<string, unknown>,
     extra?: unknown
   ) => {
-    console.group(`[${this.constructor.name}] Resolving`);
-    console.debug(`Command:`);
-    console.debug(command);
-    console.debug(`Extra:`);
-    console.debug(extra);
-    console.groupEnd();
+    console.debug('[ResolveCommandRegistry] Resolving', command, extra);
 
     for (const key of Object.keys(command)) {
       if (this.#cmds.has(key)) {
@@ -63,7 +58,7 @@ export class ResolveCommandRegistry {
 
     hookTarget.instance.resolveCommand = this.resolveCommand;
 
-    console.debug(`[${this.constructor.name}] Hooked:`, this.#originalFn);
+    console.debug('[ResolveCommandRegistry] Hooked:', this.#originalFn);
   }
 
   private static checkHookTarget(targetName: string) {
@@ -102,7 +97,7 @@ export class ResolveCommandRegistry {
         if (hook) {
           resolve(hook);
         } else {
-          setTimeout(poll, 0);
+          setTimeout(poll, 50);
         }
       };
       poll();
@@ -120,10 +115,6 @@ export class ResolveCommandRegistry {
 
   setHook(command: string, fn: ResolveCommandHook) {
     this.#cmds.set(command, fn);
-  }
-
-  removeHook(command: string) {
-    this.#cmds.delete(command);
   }
 
   dispatchCommand(payload: ResolveCommandPayload, extra?: unknown) {

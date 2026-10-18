@@ -1,6 +1,7 @@
 import { configRead } from './config';
+import { t } from './i18n';
 import { getPlayerManager, PlayerMode } from './player_api';
-import type { EventMapOf, PlayerManager, VideoID } from './player_api';
+import type { PlayerManager } from './player_api';
 import { showNotification } from './ui';
 
 const playerManager = await getPlayerManager();
@@ -8,8 +9,6 @@ const playerManager = await getPlayerManager();
 function shouldForce() {
   return configRead('forceHighResVideo');
 }
-
-type EventMap = EventMapOf<PlayerManager>;
 
 function getMaxQualityLabel(player: PlayerManager['player']) {
   return player.getAvailableQualityData()[0]?.qualityLabel;
@@ -23,12 +22,10 @@ function notifyPlaybackQuality(this: PlayerManager) {
   const selected = player.getPlaybackQualityLabel();
   const max = getMaxQualityLabel(player);
 
-  showNotification(`${selected} selected (Max ${max})`, 3000);
-
-  this.removeEventListener('playbackStart', notifyPlaybackQuality);
+  showNotification(t('quality.selected', { selected, max: max ?? '?' }), 3000);
 }
 
-function setPlaybackQuality(this: PlayerManager, _: unknown) {
+function setPlaybackQuality(this: PlayerManager) {
   if (this.playerMode === PlayerMode.PREVIEW) return;
 
   console.debug('[video-quality] setting playback quality');
@@ -61,7 +58,7 @@ function setPlaybackQuality(this: PlayerManager, _: unknown) {
   }, 3000);
 }
 
-function handleNewVideo(this: PlayerManager, _: EventMap['newVideo']) {
+function handleNewVideo(this: PlayerManager) {
   if (!shouldForce()) return;
 
   this.removeEventListener('playbackStart', setPlaybackQuality);

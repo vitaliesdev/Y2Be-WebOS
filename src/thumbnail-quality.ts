@@ -1,36 +1,4 @@
-const webpTestImgs = {
-  lossy: 'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA',
-  lossless: 'UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==',
-  alpha:
-    'UklGRkoAAABXRUJQVlA4WAoAAAAQAAAAAAAAAAAAQUxQSAwAAAARBxAR/Q9ERP8DAABWUDggGAAAABQBAJ0BKgEAAQAAAP4AAA3AAP7mtQAAAA==',
-  animation:
-    'UklGRlIAAABXRUJQVlA4WAoAAAASAAAAAAAAAAAAQU5JTQYAAAD/////AABBTk1GJgAAAAAAAAAAAAAAAAAAAGQAAABWUDhMDQAAAC8AAAAQBxAREYiI/gcA'
-} as const;
-
-function checkWebpFeature(
-  feature: keyof typeof webpTestImgs,
-  callback: (
-    featureName: keyof typeof webpTestImgs,
-    isSupported: boolean
-  ) => void
-) {
-  const img = new Image();
-  img.onload = function () {
-    const result = img.width > 0 && img.height > 0;
-    callback(feature, result);
-  };
-
-  img.onerror = function () {
-    callback(feature, false);
-  };
-
-  img.src = 'data:image/webp;base64,' + webpTestImgs[feature];
-}
-
-let webpSupported = false;
-checkWebpFeature('lossy', (_, support) => {
-  webpSupported = support;
-});
+import { configAddChangeListener, configRead } from './config';
 
 function rewriteURL(url: URL) {
   const YT_THUMBNAIL_PATHNAME_REGEX =
@@ -51,7 +19,7 @@ function rewriteURL(url: URL) {
     YT_THUMBNAIL_PATHNAME_REGEX,
     (match, p1, p2, p3) => {
       if (!YT_TARGET_THUMBNAIL_NAMES.includes(p2)) return match; // Only rewrite regular thumbnail URLs. Not shorts, etc.
-      return `${webpSupported ? 'vi_webp' : 'vi'}${p1}sddefault${p3 ?? ''}.${webpSupported ? 'webp' : 'jpg'}`;
+      return `vi_webp${p1}sddefault${p3 ?? ''}.webp`;
     }
   );
   if (url.pathname === replacementPathname)
@@ -154,8 +122,6 @@ function enableObserver() {
     attributeOldValue: true
   });
 }
-
-import { configRead, configAddChangeListener } from './config';
 
 if (configRead('upgradeThumbnails')) enableObserver();
 

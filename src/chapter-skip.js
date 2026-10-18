@@ -1,6 +1,9 @@
 // Skip to the previous/next chapter with the red/yellow remote buttons.
 import { configRead } from './config';
 import { addJSONParseFilter } from './hooks/json-parse';
+import { t } from './i18n';
+import { getCurrentVideoId, isWatchPage } from './nav';
+import { onColorKey } from './remote-keys';
 import { showNotification } from './ui';
 import {
   extractChapters,
@@ -8,10 +11,6 @@ import {
   startsFromWidths
 } from './chapters-data';
 
-const RED_CODES = [403, 166];
-const YELLOW_CODES = [405, 170];
-const DOUBLE_PRESS_MS = 300;
-let lastSkipAt = 0;
 /** @type {{ videoId: string | null, target: number } | null} */
 let lastSkip = null;
 
@@ -31,10 +30,6 @@ addJSONParseFilter((r) => {
     }
   }
 });
-
-function getCurrentURL() {
-  return new URL(location.hash.substring(1), location.href);
-}
 
 /** Fallback: read chapters from the progress bar, if it's in the DOM. */
 function readChaptersFromBar(duration) {
@@ -58,13 +53,13 @@ function skipChapter(direction) {
   const video = document.querySelector('video');
   if (!video || !video.duration) return;
 
-  const videoId = getCurrentURL().searchParams.get('v');
+  const videoId = getCurrentVideoId();
   const starts =
     (videoId ? chaptersByVideo.get(videoId) : undefined) ??
     readChaptersFromBar(video.duration);
 
   if (!starts) {
-    showNotification('No chapters found');
+    showNotification(t('chapters.none'));
     return;
   }
 
@@ -83,7 +78,7 @@ function skipChapter(direction) {
   const target = getChapterTarget(starts, currentTime, direction);
   if (target === null || target >= video.duration) {
     showNotification(
-      direction === 'next' ? 'No next chapter' : 'Start of video'
+      t(direction === 'next' ? 'chapters.noNext' : 'chapters.start')
     );
     return;
   }
@@ -98,7 +93,11 @@ function skipChapter(direction) {
   }
   lastSkip = { videoId, target };
   showNotification(
-    `${direction === 'next' ? 'Next chapter' : 'Previous chapter'}: ${starts.indexOf(target) + 1}/${starts.length} · ${formatTime(target)}`,
+    t(direction === 'next' ? 'chapters.next' : 'chapters.prev', {
+      n: starts.indexOf(target) + 1,
+      total: starts.length,
+      time: formatTime(target)
+    }),
     2000
   );
 }
@@ -112,32 +111,6 @@ function formatTime(seconds) {
   return h ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`;
 }
 
-/** @param {KeyboardEvent} evt */
-function keyHandler(evt) {
-  const code = evt.keyCode || evt.charCode;
-  const direction = RED_CODES.includes(code)
-    ? 'prev'
-    : YELLOW_CODES.includes(code)
-      ? 'next'
-      : null;
-  if (!direction) return;
-
-  if (!configRead('chapterSkipButtons')) return;
-  if (getCurrentURL().pathname !== '/watch') return;
-
-  evt.preventDefault();
-  evt.stopPropagation();
-  if (evt.type !== 'keydown') return;
-
-  // Some webOS remotes send two key codes per color button press (e.g. 405
-  // and 170 for yellow); treat keydowns in quick succession as one press.
-  const now = Date.now();
-  if (now - lastSkipAt < DOUBLE_PRESS_MS) return;
-  lastSkipAt = now;
-
-  skipChapter(direction);
-}
-
-document.addEventListener('keydown', keyHandler, true);
-document.addEventListener('keypress', keyHandler, true);
-document.addEventListener('keyup', keyHandler, true);
+const enabled = () => configRead('chapterSkipButtons') && isWatchPage();
+onColorKey('red', () => skipChapter('prev'), enabled);
+onColorKey('yellow', () => skipChapter('next'), enabled);

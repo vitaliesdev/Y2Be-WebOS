@@ -1,45 +1,19 @@
 import sha256 from 'tiny-sha256';
 import { configAddChangeListener, configRead } from './config';
+import { t } from './i18n';
+import { getCurrentURL } from './nav';
 import { showNotification } from './ui';
 import { findNextSegment, getSkipDelay } from './sponsorblock-schedule';
 
 // Copied from https://github.com/ajayyy/SponsorBlock/blob/9392d16617d2d48abb6125c00e2ff6042cb7bebe/src/config.ts#L179-L233
-const barTypes = {
-  sponsor: {
-    color: '#00d400',
-    opacity: '0.7',
-    name: 'sponsored segment'
-  },
-  intro: {
-    color: '#00ffff',
-    opacity: '0.7',
-    name: 'intro'
-  },
-  outro: {
-    color: '#0202ed',
-    opacity: '0.7',
-    name: 'outro'
-  },
-  interaction: {
-    color: '#cc00ff',
-    opacity: '0.7',
-    name: 'interaction reminder'
-  },
-  selfpromo: {
-    color: '#ffff00',
-    opacity: '0.7',
-    name: 'self-promotion'
-  },
-  music_offtopic: {
-    color: '#ff9900',
-    opacity: '0.7',
-    name: 'non-music part'
-  },
-  preview: {
-    color: '#008fd6',
-    opacity: '0.7',
-    name: 'recap or preview'
-  }
+const barColors = {
+  sponsor: '#00d400',
+  intro: '#00ffff',
+  outro: '#0202ed',
+  interaction: '#cc00ff',
+  selfpromo: '#ffff00',
+  music_offtopic: '#ff9900',
+  preview: '#008fd6'
 };
 
 // Maps each SponsorBlock category to the config option that enables skipping it.
@@ -240,9 +214,9 @@ class SponsorBlockHandler {
 
     // Custom tag names: YouTube's renderer (incremental-dom) can adopt foreign
     // `div`s while patching its own tree and wipe their children.
-    this.sliderSegmentsOverlay = document.createElement('ytaf-sb-overlay');
+    this.sliderSegmentsOverlay = document.createElement('y2be-sb-overlay');
     this.sliderSegmentsOverlay.className =
-      'ytaf-sponsorblock-segment-container';
+      'y2be-sponsorblock-segment-container';
     this.renderSegments();
 
     const addSliderObserver = (ele) => {
@@ -386,12 +360,10 @@ class SponsorBlockHandler {
 
     this.segments.forEach((segment) => {
       const [start, end] = segment.segment;
-      const barType = barTypes[segment.category] || {
-        color: 'blue'
-      };
-      const elm = document.createElement('ytaf-sb-segment');
-      elm.className = 'ytaf-sponsorblock-segment';
-      elm.style['background-color'] = barType.color;
+      const color = barColors[segment.category] || 'blue';
+      const elm = document.createElement('y2be-sb-segment');
+      elm.className = 'y2be-sponsorblock-segment';
+      elm.style['background-color'] = color;
       elm.style['left'] = `${(start / videoDuration) * 100.0}%`;
       elm.style['width'] = `${((end - start) / videoDuration) * 100.0}%`;
       overlay.appendChild(elm);
@@ -503,9 +475,9 @@ class SponsorBlockHandler {
         return;
       }
 
-      const skipName = barTypes[segment.category]?.name || segment.category;
+      const skipName = t('sb.' + segment.category);
       console.debug(this.videoID, 'Skipping', segment);
-      showNotification(`Skipping ${skipName}`, 2000, 'indigo');
+      showNotification(t('sb.skipping', { segment: skipName }), 2000, 'indigo');
       this.video.currentTime = end;
       this.scheduleSkip();
     }, delay);
@@ -563,12 +535,7 @@ class SponsorBlockHandler {
   }
 }
 
-// When this global variable was declared using let and two consecutive hashchange
-// events were fired (due to bubbling? not sure...) the second call handled below
-// would not see the value change from first call, and that would cause multiple
-// SponsorBlockHandler initializations... This has been noticed on Chromium 38.
-// This either reveals some bug in chromium/webpack/babel scope handling, or
-// shows my lack of understanding of javascript. (or both)
+// The handler for the video being watched, if any.
 window.sponsorblock = null;
 
 function uninitializeSponsorblock() {
@@ -581,10 +548,6 @@ function uninitializeSponsorblock() {
     console.warn('window.sponsorblock.destroy() failed!', err);
   }
   window.sponsorblock = null;
-}
-
-function getCurrentURL() {
-  return new URL(location.hash.substring(1), location.href);
 }
 
 function initializeSponsorblock(videoID) {

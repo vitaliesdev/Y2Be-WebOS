@@ -112,7 +112,7 @@ const makeConfig = (_env, argv) => [
         }
       }),
       new webpack.DefinePlugin({
-        __YTAF_VERSION__: JSON.stringify(pkgJson.version)
+        __APP_VERSION__: JSON.stringify(pkgJson.version)
       })
     ]
   }

@@ -23,8 +23,7 @@ function getYTURL() {
  * @returns {URLSearchParams}
  */
 function concatSearchParams(a, b) {
-  // Not `new URLSearchParams([...entries])`: sequence init needs Chrome 61+,
-  // and the webOS 4 build relies on the native URLSearchParams.
+  // Not `new URLSearchParams([...entries])`: sequence init needs Chrome 61.
   const result = new URLSearchParams(a.toString());
   b.forEach((value, key) => {
     result.append(key, value);
@@ -41,10 +40,6 @@ export function handleLaunch(params) {
   // fallback to "contentTarget" if our custom param is not specified.
   //
   let { target, contentTarget = target } = params;
-
-  /** TODO: Handle google assistant
-   * Sample: {contentTarget: "v=v=<ID>", storeCaller: "voice", subReason: "voiceAgent", voiceEngine: "googleAssistant"}
-   */
 
   switch (typeof contentTarget) {
     case 'string': {
