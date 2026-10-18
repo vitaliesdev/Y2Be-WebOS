@@ -129,6 +129,7 @@ class SponsorBlockHandler {
 
   slider = null;
   sliderInterval = null;
+  sliderKeyHandler = null;
   sliderObserver = null;
   sliderSegmentsOverlay = null;
   // Set when the progress bar has chapters: the overlay goes next to it.
@@ -295,42 +296,63 @@ class SponsorBlockHandler {
       }, 250);
     };
 
+    const stopWatchingForSlider = () => {
+      clearInterval(this.sliderInterval);
+      this.sliderInterval = null;
+      if (this.sliderKeyHandler) {
+        document.removeEventListener('keydown', this.sliderKeyHandler, true);
+        this.sliderKeyHandler = null;
+      }
+    };
+
+    const trySlider = () => {
+      const slider = findSlider();
+      if (!slider) return false; // no slider found yet
+
+      this.slider = slider;
+      this.overlayAnchor = findAncestor(
+        slider,
+        'YTLR-MULTI-MARKERS-PLAYER-BAR-RENDERER'
+      );
+
+      const positioned = this.overlayAnchor?.parentElement ?? slider;
+      // Without chapters the overlay is absolutely positioned inside the slider.
+      if (
+        !this.overlayAnchor &&
+        window.getComputedStyle(slider).position === 'static'
+      ) {
+        slider.style.position = 'relative';
+      }
+
+      console.debug('slider found...', this.slider, this.overlayAnchor);
+      stopWatchingForSlider();
+      // Observe the parent so removal of the slider itself is noticed.
+      addSliderObserver(positioned.parentElement ?? positioned);
+      addSliderOverlay();
+
+      // Showing/hiding the controls doesn't always cause a DOM mutation or a
+      // video event (e.g. while paused), so also sync periodically.
+      clearInterval(this.overlaySyncInterval);
+      this.overlaySyncInterval = this.overlayAnchor
+        ? setInterval(() => this.syncOverlayPosition(), 500)
+        : null;
+      return true;
+    };
+
+    // The progress bar is often missing for most of the video (controls
+    // hidden), so avoid polling the whole page at a high rate. Poll slowly,
+    // and check right after a key press, which is what brings the controls up.
     const watchForSlider = () => {
-      if (this.sliderInterval) clearInterval(this.sliderInterval);
+      stopWatchingForSlider();
+      if (trySlider()) return;
 
-      this.sliderInterval = setInterval(() => {
-        const slider = findSlider();
-        if (!slider) return; // no slider found yet
-
-        this.slider = slider;
-        this.overlayAnchor = findAncestor(
-          slider,
-          'YTLR-MULTI-MARKERS-PLAYER-BAR-RENDERER'
-        );
-
-        const positioned = this.overlayAnchor?.parentElement ?? slider;
-        // Without chapters the overlay is absolutely positioned inside the slider.
-        if (
-          !this.overlayAnchor &&
-          window.getComputedStyle(slider).position === 'static'
-        ) {
-          slider.style.position = 'relative';
-        }
-
-        console.debug('slider found...', this.slider, this.overlayAnchor);
-        clearInterval(this.sliderInterval);
-        this.sliderInterval = null;
-        // Observe the parent so removal of the slider itself is noticed.
-        addSliderObserver(positioned.parentElement ?? positioned);
-        addSliderOverlay();
-
-        // Showing/hiding the controls doesn't always cause a DOM mutation or a
-        // video event (e.g. while paused), so also sync periodically.
-        clearInterval(this.overlaySyncInterval);
-        this.overlaySyncInterval = this.overlayAnchor
-          ? setInterval(() => this.syncOverlayPosition(), 500)
-          : null;
-      }, 100);
+      this.sliderInterval = setInterval(trySlider, 1000);
+      this.sliderKeyHandler = () => {
+        setTimeout(() => {
+          if (this.sliderInterval) trySlider();
+        }, 150);
+      };
+      document.addEventListener('keydown', this.sliderKeyHandler, true);
     };
     this.watchForSlider = watchForSlider;
 
@@ -399,9 +421,19 @@ class SponsorBlockHandler {
     const rect = connected ? this.slider.getBoundingClientRect() : null;
     const hidden = !rect || rect.width === 0 || isHiddenByAncestor(this.slider);
 
+    // The bar element is taller than the visible line, which only fills it
+    // while focused. Take the vertical extent from a chapter segment instead.
+    const chapter = connected
+      ? this.slider.querySelector('[idomkey^="chapter-"]')
+      : null;
+    const chapterRect = chapter?.getBoundingClientRect();
+    const useChapter = chapterRect !== undefined && chapterRect.height > 0;
+    const top = useChapter ? chapterRect.top : rect?.top;
+    const height = useChapter ? chapterRect.height : rect?.height;
+
     const sig = hidden
       ? 'hidden'
-      : `${rect.left}_${rect.top}_${rect.width}_${rect.height}`;
+      : `${rect.left}_${top}_${rect.width}_${height}`;
     if (sig === this.lastOverlaySig) return;
     this.lastOverlaySig = sig;
 
@@ -409,9 +441,9 @@ class SponsorBlockHandler {
     style.display = hidden ? 'none' : '';
     if (hidden) return;
     style.left = `${rect.left}px`;
-    style.top = `${rect.top}px`;
+    style.top = `${top}px`;
     style.width = `${rect.width}px`;
-    style.height = `${rect.height}px`;
+    style.height = `${height}px`;
   }
 
   scheduleSkip() {
@@ -504,6 +536,11 @@ class SponsorBlockHandler {
     if (this.sliderInterval) {
       clearInterval(this.sliderInterval);
       this.sliderInterval = null;
+    }
+
+    if (this.sliderKeyHandler) {
+      document.removeEventListener('keydown', this.sliderKeyHandler, true);
+      this.sliderKeyHandler = null;
     }
 
     if (this.sliderObserver) {
