@@ -23,18 +23,37 @@ It started as a fork of [webosbrew/youtube-webos](https://github.com/webosbrew/y
 
 ## Features
 
-- Ad blocking
-- SponsorBlock: skips sponsors, intros, reminders and more, and marks them on the progress bar (also on videos with chapters)
-- Hide Shorts everywhere, including the sidebar
-- Remote shortcuts:
+- **No ads.** Video ads, banners, sponsored tiles and promoted Shorts are removed before they load.
+- **SponsorBlock built in.** Sponsors, intros, outros, subscribe reminders, self-promotion, non-music parts and recaps are skipped automatically and marked on the progress bar. Every category can be turned on or off.
+- **No Shorts.** Gone from home, search, subscriptions and the sidebar.
+- **The remote does more:**
   - 🟩 **Green**: settings
-  - 🟥 **Red** / 🟨 **Yellow** in a video: previous / next chapter
-  - 🟥 **Red** elsewhere: refresh the page (e.g. new recommendations)
+  - 🟥 **Red** / 🟨 **Yellow** in a video: jump to the previous / next chapter
+  - 🟥 **Red** anywhere else: refresh the page for new recommendations
   - 🟦 **Blue** in a video: audio-only mode
-- Force the highest video quality
-- Remove end screens and skip the account selection screen
-- Higher-quality thumbnails, on-screen clock, hide the logo
-- English and Spanish
+- **Best quality, always.** Forces the highest resolution the video offers.
+- **Fewer interruptions.** No end screens and no "who's watching?" screen on startup.
+- **Sharper thumbnails**, an on-screen clock and the option to hide the logo.
+- **Fast and light.** A small, optimized script built for webOS 4 and newer.
+- **Speaks your language.** Settings in English or Spanish, following the TV.
+- **Nothing lost from the official app.** The remote's YouTube button, casting from your phone, voice search and your account all keep working.
+
+### Y2Be TV vs. the original
+
+|                                         | youtube-webos        | **Y2Be TV**                       |
+| --------------------------------------- | -------------------- | --------------------------------- |
+| Ad blocking and SponsorBlock            | ✅                   | ✅                                |
+| SponsorBlock on videos with chapters    | ❌ Broken            | ✅                                |
+| Skips when you jump into a segment      | ❌                   | ✅                                |
+| Correct skips at any playback speed     | ❌                   | ✅                                |
+| SponsorBlock settings apply instantly   | ❌ Next video        | ✅                                |
+| Hide Shorts                             | Subscriptions only   | **Everywhere, sidebar included**  |
+| Jump between chapters with the remote   | ❌                   | ✅                                |
+| Refresh recommendations with the remote | ❌                   | ✅                                |
+| Settings language                       | English              | **English and Spanish**           |
+| Injected script size                    | 274 KB               | **126 KB**                        |
+| Progress bar polling during playback    | Every 100 ms         | **Once a second, only if needed** |
+| Optimized for webOS 4+                  | ❌ Built for webOS 1 | ✅                                |
 
 ## Download
 
