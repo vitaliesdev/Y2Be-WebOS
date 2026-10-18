@@ -25,6 +25,7 @@
 - [Autostart Support](#autostart)
 - Force Highest Video Quality
 - Audio-Only Mode (🟦 Blue button on remote)
+- Chapter Skipping (🟥 Red / 🟨 Yellow buttons on remote)
 - Full Animation Support
 - Shorts Removal
 - Higher-Quality Thumbnails

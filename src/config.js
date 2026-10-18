@@ -73,6 +73,13 @@ const configOptions = new Map([
       default: false,
       desc: 'Bypass initial account selection on startup'
     }
+  ],
+  [
+    'chapterSkipButtons',
+    {
+      default: true,
+      desc: 'Skip chapters with [RED]/[YELLOW] buttons'
+    }
   ]
 ]);
 

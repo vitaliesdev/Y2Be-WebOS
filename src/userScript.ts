@@ -16,6 +16,8 @@ import './app_api/index';
 import './adblock.js';
 import './hooks/json-stringify';
 import './shorts.js';
+// Before modules with top-level await, to see the first video's chapters.
+import './chapter-skip';
 import './sponsorblock.js';
 import './ui.js';
 import './font-fix.css';
