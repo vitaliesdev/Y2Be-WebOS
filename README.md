@@ -2,15 +2,19 @@
   YouTube Ad-Free
 </h1>
 <p align="center">
-  <img src="https://img.shields.io/github/stars/webosbrew/youtube-webos?style=flat-square&logo=github" alt="GitHub Stars">
-  <img src="https://img.shields.io/github/v/release/webosbrew/youtube-webos?style=flat-square" alt="Latest Release">
-  <img src="https://img.shields.io/github/contributors/webosbrew/youtube-webos?style=flat-square" alt="Contributors">
-  <img src="https://img.shields.io/github/downloads/webosbrew/youtube-webos/total?style=flat-square" alt="Total Downloads">
+  <img src="https://img.shields.io/github/stars/vitaliesdev/youtube-huevos?style=flat-square&logo=github" alt="GitHub Stars">
+  <img src="https://img.shields.io/github/v/release/vitaliesdev/youtube-huevos?style=flat-square" alt="Latest Release">
+  <img src="https://img.shields.io/github/contributors/vitaliesdev/youtube-huevos?style=flat-square" alt="Contributors">
+  <img src="https://img.shields.io/github/downloads/vitaliesdev/youtube-huevos/total?style=flat-square" alt="Total Downloads">
   <img src="https://img.shields.io/badge/LG-webOS-000000?logo=webos&logoColor=white&style=flat-square" alt="webOS">
 </p>
 
 <p align="center">
   YouTube app for webOS TV with ad blocking and other enhancements
+</p>
+
+<p align="center">
+  Fork of <a href="https://github.com/webosbrew/youtube-webos">webosbrew/youtube-webos</a>
 </p>
 
 ![Configuration Screen](./screenshots/1_sm.jpg?raw=true)
@@ -51,9 +55,9 @@
 You can install the app using one of the following methods:
 
 - **[webOS Homebrew Channel](https://github.com/webosbrew/webos-homebrew-channel):**
-  App is available in the official webOS Brew repository.
+  Installs the original app from the official webOS Brew repository, not this fork.
 - **[Device Manager](https://github.com/webosbrew/dev-manager-desktop):**
-  Use a pre-built `.ipk` file from the [Releases](https://github.com/webosbrew/youtube-webos/releases) page.
+  Use a pre-built `.ipk` file from the [Releases](https://github.com/vitaliesdev/youtube-huevos/releases) page.
 - **Command Line (webOS CLI):** Configure the tools [below](#development-setup)
 
 ---
@@ -89,8 +93,8 @@ luna-send-pub -n 1 'luna://com.webos.service.eim/deleteDevice' '{"appId":"youtub
 1. Clone the repository.
 
    ```sh
-   git clone https://github.com/webosbrew/youtube-webos.git
-   cd youtube-webos
+   git clone https://github.com/vitaliesdev/youtube-huevos.git
+   cd youtube-huevos
    ```
 
 2. Install dependencies.
@@ -106,7 +110,11 @@ pnpm run build:dev
 pnpm run package
 ```
 
-The `.ipk` file will be generated in the project root directory. You can stop here if you're fine with installing the IPK via [the webOS Dev Manager app](https://github.com/webosbrew/dev-manager-desktop). Alternatively, continue below if you want to make it so you can install the IPK on your TV with one command.
+The `.ipk` file will be generated in the project root directory.
+
+For a smaller IPK that only supports webOS 4 and newer, run `pnpm run build:webos4` instead. It is generated in the `webos4` directory.
+
+You can stop here if you're fine with installing the IPK via [the webOS Dev Manager app](https://github.com/webosbrew/dev-manager-desktop). Alternatively, continue below if you want to make it so you can install the IPK on your TV with one command.
 
 ### On the TV
 
