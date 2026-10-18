@@ -1,7 +1,7 @@
 {
-  "name": "youtube-webos",
-  "version": "0.5.3",
-  "description": "Ad-free YouTube app for webOS",
+  "name": "y2be-webos",
+  "version": "1.0.0",
+  "description": "Alternative YouTube client for LG webOS TVs (webOS 4+)",
   "type": "module",
   "main": "index.js",
   "scripts": {
@@ -17,10 +17,10 @@
     "lint:prettier": "prettier --check .",
     "lint:all": "pnpm run \"/^lint:(?!all)/\""
   },
-  "repository": "github:vitaliesdev/youtube-huevos",
+  "repository": "github:vitaliesdev/Y2Be-WebOS",
   "license": "GPL-3.0-only",
-  "bugs": "https://github.com/vitaliesdev/youtube-huevos/issues",
-  "homepage": "https://github.com/vitaliesdev/youtube-huevos#readme",
+  "bugs": "https://github.com/vitaliesdev/Y2Be-WebOS/issues",
+  "homepage": "https://github.com/vitaliesdev/Y2Be-WebOS#readme",
   "dependencies": {
     "@babel/runtime-corejs3": "^7.29.2",
     "core-js-pure": "^3.49.0",
