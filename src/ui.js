@@ -385,7 +385,7 @@ async function initAudioOnlyToggle() {
       textContent: 'Audio-Only Mode Enabled - Press [BLUE] to toggle',
       className: YTAF_OVERLAY_CLASS
     });
-    root.prepend(overlay);
+    root.insertBefore(overlay, root.firstChild);
   };
   updateOverlay();
 

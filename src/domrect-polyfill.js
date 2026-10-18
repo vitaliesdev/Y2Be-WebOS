@@ -100,7 +100,8 @@
 		});
 	}
 	
-	global.DOMRect = DOMRect;
+	// Only webOS 4 (Chrome 53) lacks DOMRect; keep the native one elsewhere.
+	if (typeof global.DOMRect !== 'function') global.DOMRect = DOMRect;
 }(self));
 
 /**

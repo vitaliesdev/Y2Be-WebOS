@@ -7,7 +7,6 @@
   "scripts": {
     "build": "webpack --mode=production",
     "build:dev": "webpack --mode=development",
-    "build:webos4": "node tools/build-webos4.js",
     "package": "ares-package -n dist",
     "deploy": "node tools/deploy.js",
     "inspect": "ares-inspect youtube.leanback.v4",
@@ -27,9 +26,7 @@
   "dependencies": {
     "@babel/runtime-corejs3": "^7.29.2",
     "core-js-pure": "^3.49.0",
-    "regenerator-runtime": "^0.14.1",
-    "tiny-sha256": "^1.0.2",
-    "whatwg-fetch": "^3.6.20"
+    "tiny-sha256": "^1.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
@@ -45,7 +42,6 @@
     "@webos-tools/cli": "github:fire332/webos-cli#6cfbcf231a0fa1e50519d370ee6e5edc71c4998a",
     "babel-loader": "^10.1.1",
     "babel-plugin-polyfill-corejs3": "^0.14.2",
-    "babel-plugin-polyfill-regenerator": "^0.6.8",
     "copy-webpack-plugin": "^14.0.0",
     "css-loader": "^7.1.4",
     "es-check": "^9.6.4",

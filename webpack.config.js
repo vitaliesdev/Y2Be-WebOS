@@ -18,10 +18,6 @@ function transformAppInfo(input) {
 /** @type {(env: Record<string, string>, argv: { mode?: string }) => (import('webpack').Configuration)[]} */
 const makeConfig = (_env, argv) => [
   {
-    /**
-     * NOTE: Builds with devtool = 'eval' contain very big eval chunks which seem
-     * to cause segfaults (at least) on nodeJS v0.12.2 used on webOS 3.x.
-     */
     devtool: argv.mode === 'development' ? 'inline-source-map' : 'source-map',
 
     optimization: {
@@ -32,7 +28,7 @@ const makeConfig = (_env, argv) => [
       minimizer: [
         new TerserPlugin({
           terserOptions: {
-            ecma: process.env.YTAF_TARGET === 'webos4' ? 2015 : 5,
+            ecma: 2015,
             // Debug logging (e.g. on every `timeupdate`) is only useful in
             // development builds.
             compress: { pure_funcs: ['console.debug'] }
@@ -50,10 +46,7 @@ const makeConfig = (_env, argv) => [
     },
 
     resolve: {
-      extensions: ['.mjs', '.cjs', '.js', '.json', '.ts'],
-      // webOS 4+ (Chrome 53) has a native fetch, so skip the polyfill.
-      alias:
-        process.env.YTAF_TARGET === 'webos4' ? { 'whatwg-fetch': false } : {}
+      extensions: ['.mjs', '.cjs', '.js', '.json', '.ts']
     },
 
     module: {

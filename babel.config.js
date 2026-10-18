@@ -17,8 +17,6 @@ function makeConfig(api) {
     // https://github.com/webpack/webpack/issues/9379#issuecomment-509628205
     // https://babel.dev/docs/options#sourcetype
     sourceType: 'unambiguous',
-    // `pnpm run build:webos4` targets webOS 4+ only (smaller, less transpiled).
-    ...(process.env.YTAF_TARGET === 'webos4' && { targets: 'chrome 53' }),
     // https://babel.dev/docs/assumptions
     assumptions: {
       noNewArrows: true
@@ -45,14 +43,8 @@ function makeConfig(api) {
             'esnext.json.parse',
             // Chrome 53 has URL and URLSearchParams with everything we use;
             // core-js only flags them for minor spec gaps (~60 KB unminified).
-            ...(process.env.YTAF_TARGET === 'webos4' ? [/^web\.url/] : [])
+            /^web\.url/
           ]
-        }
-      ],
-      [
-        'polyfill-regenerator',
-        {
-          method: 'usage-pure'
         }
       ]
     ],

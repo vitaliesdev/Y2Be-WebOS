@@ -56,17 +56,11 @@ const categoryConfigKeys = {
 const sponsorblockAPI = 'https://sponsorblock.inf.re/api';
 
 /**
- * Nearest ancestor of `elm` (exclusive) with the given tag name, or null.
- * (`Element.closest` is not available on all supported webOS versions.)
- * @param {Element} elm
- * @param {string} tagName Uppercase tag name
- * @returns {HTMLElement | null}
+ * Whether `node` is in the document. (`Node.isConnected` needs Chrome 54.)
+ * @param {Node | null | undefined} node
  */
-function findAncestor(elm, tagName) {
-  for (let node = elm.parentElement; node; node = node.parentElement) {
-    if (node.tagName === tagName) return node;
-  }
-  return null;
+function isAttached(node) {
+  return !!node && document.contains(node);
 }
 
 /**
@@ -292,7 +286,7 @@ class SponsorBlockHandler {
       if (readdTimeout !== null) return;
       readdTimeout = setTimeout(() => {
         readdTimeout = null;
-        if (this.active && this.slider?.isConnected) addSliderOverlay();
+        if (this.active && isAttached(this.slider)) addSliderOverlay();
       }, 250);
     };
 
@@ -310,9 +304,8 @@ class SponsorBlockHandler {
       if (!slider) return false; // no slider found yet
 
       this.slider = slider;
-      this.overlayAnchor = findAncestor(
-        slider,
-        'YTLR-MULTI-MARKERS-PLAYER-BAR-RENDERER'
+      this.overlayAnchor = slider.parentElement?.closest(
+        'ytlr-multi-markers-player-bar-renderer'
       );
 
       const positioned = this.overlayAnchor?.parentElement ?? slider;
@@ -417,7 +410,7 @@ class SponsorBlockHandler {
     }
 
     // All reads first, then writes, to avoid extra reflows.
-    const connected = this.slider?.isConnected ?? false;
+    const connected = isAttached(this.slider);
     const rect = connected ? this.slider.getBoundingClientRect() : null;
     const hidden = !rect || rect.width === 0 || isHiddenByAncestor(this.slider);
 
@@ -457,7 +450,7 @@ class SponsorBlockHandler {
 
     // The player UI may replace the whole progress bar (e.g. when switching
     // between layouts with and without chapters) out of the observer's sight.
-    if (this.slider && !this.slider.isConnected && !this.sliderInterval) {
+    if (this.slider && !isAttached(this.slider) && !this.sliderInterval) {
       console.debug('slider detached, watching again');
       this.sliderObserver?.disconnect();
       this.watchForSlider?.();
