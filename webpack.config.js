@@ -29,7 +29,13 @@ const makeConfig = (_env, argv) => [
        * terser doesn't pickup browserlist config
        * See: https://github.com/terser/terser/issues/235
        */
-      minimizer: [new TerserPlugin({ terserOptions: { ecma: 5 } })]
+      minimizer: [
+        new TerserPlugin({
+          terserOptions: {
+            ecma: process.env.YTAF_TARGET === 'webos4' ? 2015 : 5
+          }
+        })
+      ]
     },
 
     entry: {

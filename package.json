@@ -7,6 +7,7 @@
   "scripts": {
     "build": "webpack --mode=production",
     "build:dev": "webpack --mode=development",
+    "build:webos4": "node tools/build-webos4.js",
     "package": "ares-package -n dist",
     "deploy": "node tools/deploy.js",
     "inspect": "ares-inspect youtube.leanback.v4",
