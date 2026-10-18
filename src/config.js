@@ -80,6 +80,13 @@ const configOptions = new Map([
       default: true,
       desc: 'Skip chapters with [RED]/[YELLOW] buttons'
     }
+  ],
+  [
+    'refreshButton',
+    {
+      default: true,
+      desc: 'Refresh page with [RED] button (outside the player)'
+    }
   ]
 ]);
 

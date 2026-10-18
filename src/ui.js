@@ -157,6 +157,7 @@ function createOptionsPanel() {
   elmContainer.appendChild(createConfigCheckbox('removeEndscreen'));
   elmContainer.appendChild(createConfigCheckbox('autoAccountSelect'));
   elmContainer.appendChild(createConfigCheckbox('chapterSkipButtons'));
+  elmContainer.appendChild(createConfigCheckbox('refreshButton'));
   elmContainer.appendChild(createConfigCheckbox('enableSponsorBlock'));
 
   const elmBlock = document.createElement('blockquote');
