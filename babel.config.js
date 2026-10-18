@@ -40,7 +40,13 @@ function makeConfig(api) {
            * The way pure polyfills work completely breaks wrapper chaining.
            * The new core will only wrap each global once, which will completely side-step the issue.
            */
-          exclude: ['es.json.parse', 'esnext.json.parse']
+          exclude: [
+            'es.json.parse',
+            'esnext.json.parse',
+            // Chrome 53 has URL and URLSearchParams with everything we use;
+            // core-js only flags them for minor spec gaps (~60 KB unminified).
+            ...(process.env.YTAF_TARGET === 'webos4' ? [/^web\.url/] : [])
+          ]
         }
       ],
       [

@@ -32,7 +32,10 @@ const makeConfig = (_env, argv) => [
       minimizer: [
         new TerserPlugin({
           terserOptions: {
-            ecma: process.env.YTAF_TARGET === 'webos4' ? 2015 : 5
+            ecma: process.env.YTAF_TARGET === 'webos4' ? 2015 : 5,
+            // Debug logging (e.g. on every `timeupdate`) is only useful in
+            // development builds.
+            compress: { pure_funcs: ['console.debug'] }
           }
         })
       ]
@@ -47,7 +50,10 @@ const makeConfig = (_env, argv) => [
     },
 
     resolve: {
-      extensions: ['.mjs', '.cjs', '.js', '.json', '.ts']
+      extensions: ['.mjs', '.cjs', '.js', '.json', '.ts'],
+      // webOS 4+ (Chrome 53) has a native fetch, so skip the polyfill.
+      alias:
+        process.env.YTAF_TARGET === 'webos4' ? { 'whatwg-fetch': false } : {}
     },
 
     module: {

@@ -23,7 +23,13 @@ function getYTURL() {
  * @returns {URLSearchParams}
  */
 function concatSearchParams(a, b) {
-  return new URLSearchParams([...a.entries(), ...b.entries()]);
+  // Not `new URLSearchParams([...entries])`: sequence init needs Chrome 61+,
+  // and the webOS 4 build relies on the native URLSearchParams.
+  const result = new URLSearchParams(a.toString());
+  b.forEach((value, key) => {
+    result.append(key, value);
+  });
+  return result;
 }
 
 export function handleLaunch(params) {
