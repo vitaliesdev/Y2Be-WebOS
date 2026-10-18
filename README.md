@@ -105,19 +105,18 @@ To undo it, use `com.webos.service.eim/deleteDevice` with `{"appId":"youtube.lea
 
 ## Repository layout
 
-| Path                                                         | What                                                                                  |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| `src/userScript.ts`                                          | Entry point of the script injected into YouTube's TV interface; imports every feature |
-| `src/index.js`, `src/index.html`                             | App start page: opens YouTube's TV interface, handling deep links and voice launches  |
-| `src/adblock.js`, `src/shorts.js`, `src/remove-endscreen.ts` | Filters applied to YouTube's responses through the shared hook in `src/hooks/`        |
-| `src/sponsorblock.js`                                        | SponsorBlock: segment skipping and progress bar overlay                               |
-| `src/chapter-skip.js`, `src/page-refresh.js`                 | Red / yellow button shortcuts                                                         |
-| `src/ui.js`, `src/ui.css`                                    | Settings panel, notifications, audio-only mode                                        |
-| `src/config.js`, `src/i18n.js`                               | Settings and their defaults; English and Spanish texts                                |
-| `src/remote-keys.js`, `src/nav.js`                           | Shared helpers: remote color buttons, current page                                    |
-| `src/player_api/`, `src/app_api/`                            | Access to YouTube's player and command system                                         |
-| `assets/`                                                    | `appinfo.json` (app ID, name), icons and backgrounds                                  |
-| `tools/deploy.js`                                            | Installs the built `.ipk` on the TV                                                   |
+| Path              | What                                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `src/main.ts`     | Entry point of the script injected into YouTube's TV interface; imports every feature                               |
+| `src/launcher/`   | App start page: opens YouTube's TV interface, handling deep links and voice launches                                |
+| `src/core/`       | Shared basics: settings, translations, remote color buttons, current page, polyfills                                |
+| `src/platform/`   | Hooks into YouTube's TV app: response filters (`json-parse`), its command system (`app-api`) and player (`player/`) |
+| `src/features/`   | One file or folder per feature: ad blocking, Shorts, SponsorBlock, chapters, page refresh, video quality, clock...  |
+| `src/fixes/`      | webOS compatibility fixes: casting, screensaver, language switch, styles                                            |
+| `src/ui/`         | Settings panel, notifications, audio-only mode                                                                      |
+| `tests/`          | Unit tests (`pnpm test`, Node's built-in test runner)                                                               |
+| `assets/`         | `appinfo.json` (app ID, name), icons and backgrounds                                                                |
+| `tools/deploy.js` | Installs the built `.ipk` on the TV                                                                                 |
 
 The app ID stays `youtube.leanback.v4` on purpose: it is what lets the TV route the YouTube button, casting and voice search to this app.
 

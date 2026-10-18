@@ -3,7 +3,56 @@ import { TransformAsyncModulesPlugin } from 'transform-async-modules-webpack-plu
 import TerserPlugin from 'terser-webpack-plugin';
 import pkgJson from './package.json' with { type: 'json' };
 import webpack from 'webpack';
+import { createRequire } from 'node:module';
 import { basename } from 'node:path';
+
+const require = createRequire(import.meta.url);
+
+/** Babel options (targets come from `browserslist` in package.json). */
+const babelOptions = {
+  babelrc: false,
+  configFile: false,
+  cacheDirectory: true,
+  // Fixes "TypeError: __webpack_require__(...) is not a function"
+  // https://github.com/webpack/webpack/issues/9379#issuecomment-509628205
+  sourceType: 'unambiguous',
+  assumptions: { noNewArrows: true },
+  plugins: [
+    [
+      '@babel/plugin-transform-runtime',
+      {
+        regenerator: false,
+        version: require('@babel/runtime-corejs3/package.json').version
+      }
+    ],
+    [
+      'polyfill-corejs3',
+      {
+        method: 'usage-pure',
+        version: require('core-js-pure/package.json').version,
+        exclude: [
+          // Pure polyfills break wrapping JSON.parse, which the app relies on.
+          'es.json.parse',
+          'esnext.json.parse',
+          // Chrome 53 has URL and URLSearchParams with everything we use;
+          // core-js only flags them for minor spec gaps (~60 KB unminified).
+          /^web\.url/
+        ]
+      }
+    ]
+  ],
+  presets: [
+    ['@babel/preset-env', { bugfixes: true }],
+    [
+      '@babel/preset-typescript',
+      {
+        allExtensions: true, // TODO: remove for Babel 8
+        disallowAmbiguousJSXLike: true,
+        rewriteImportExtensions: true
+      }
+    ]
+  ]
+};
 
 /**
  * @param input {Buffer<ArrayBufferLike>}
@@ -38,9 +87,9 @@ const makeConfig = (_env, argv) => [
     },
 
     entry: {
-      index: './src/index.js',
+      index: './src/launcher/launcher.js',
       userScript: {
-        import: './src/userScript',
+        import: './src/main',
         filename: 'webOSUserScripts/[name].js'
       }
     },
@@ -62,9 +111,7 @@ const makeConfig = (_env, argv) => [
             /node_modules[\\/]core-js/,
             /node_modules[\\/]webpack[\\/]buildin/
           ],
-          options: {
-            cacheDirectory: true
-          },
+          options: babelOptions,
           resolve: {
             // File extension DON'T MATTER in a bundler.
             fullySpecified: false
@@ -99,7 +146,7 @@ const makeConfig = (_env, argv) => [
               }
             }
           },
-          { context: 'src', from: 'index.html' }
+          { context: 'src/launcher', from: 'index.html' }
         ]
       }),
       // babel doesn't transform top-level await.

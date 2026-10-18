@@ -1,9 +1,32 @@
 {
-  "extends": "./tsconfig.base.json",
+  // Type-checking only (`pnpm run lint:tsc`); Babel does the actual build.
   "compilerOptions": {
+    // Language
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["ESNext", "DOM"],
     "allowJs": true,
 
-    "lib": ["ESNext", "DOM"]
+    // Module handling
+    "composite": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+
+    // Linting
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noErrorTruncation": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUncheckedSideEffectImports": false,
+
+    // Emit
+    "emitDeclarationOnly": true,
+    "outDir": "./node_modules/.cache/tsc_build"
   },
   "include": ["./src"],
   "references": [{ "path": "./tsconfig.tooling.json" }]
